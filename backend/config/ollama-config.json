@@ -1,0 +1,38 @@
+{
+  "ollama": {
+    "servers": {
+      "local": {
+        "url": "http://localhost:11434",
+        "name": "Local Ollama Server",
+        "description": "Local Ollama installation",
+        "enabled": true
+      },
+      "external": {
+        "url": "http://YOUR_EXTERNAL_SERVER:11434",
+        "name": "External Ollama Server",
+        "description": "Remote Ollama server with 800MB model",
+        "enabled": false,
+        "models": {
+          "primary": "qwen2.5-coder-lite",
+          "fallback": "qwen2.5-coder:1.5b"
+        }
+      }
+    },
+    "activeServer": "local",
+    "fallbackEnabled": true,
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  "ai": {
+    "defaultModel": "qwen2.5-coder:1.5b",
+    "externalModel": "qwen2.5-coder-lite",
+    "parameters": {
+      "temperature": 0.1,
+      "maxTokens": 256,
+      "top_p": 0.5,
+      "top_k": 10,
+      "repeat_penalty": 1.1
+    }
+  }
+}

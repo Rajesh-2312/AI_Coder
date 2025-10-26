@@ -1,0 +1,14 @@
+import React from 'react'
+import TicTacToe from './components/TicTacToe'
+import './components/TicTacToe.css'
+
+function App() {
+  return (
+    <div className="App">
+      <h1>Tic Tac Toe Game</h1>
+      <TicTacToe />
+    </div>
+  )
+}
+
+export default App

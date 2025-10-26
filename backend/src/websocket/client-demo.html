@@ -1,0 +1,434 @@
+/**
+ * Frontend WebSocket Client for AI Streaming
+ * Handles real-time communication with AI backend
+ */
+
+class AIWebSocketClient {
+  constructor(url = 'ws://localhost:3000/ai') {
+    this.url = url;
+    this.socket = null;
+    this.isConnected = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectDelay = 1000;
+    this.heartbeatInterval = null;
+    this.activeStreams = new Map();
+    this.messageQueue = [];
+    this.backpressureThreshold = 100;
+    
+    this.setupEventHandlers();
+  }
+
+  setupEventHandlers() {
+    // Override these methods in your implementation
+    this.onConnected = () => console.log('Connected to AI WebSocket');
+    this.onDisconnected = () => console.log('Disconnected from AI WebSocket');
+    this.onError = (error) => console.error('WebSocket error:', error);
+    this.onToken = (data) => console.log('Token received:', data);
+    this.onStreamStart = (data) => console.log('Stream started:', data);
+    this.onStreamComplete = (data) => console.log('Stream completed:', data);
+    this.onStreamError = (data) => console.log('Stream error:', data);
+    this.onBackpressure = (data) => console.log('Backpressure detected:', data);
+  }
+
+  connect() {
+    try {
+      this.socket = new WebSocket(this.url);
+      
+      this.socket.onopen = () => {
+        console.log('WebSocket connection opened');
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+        this.startHeartbeat();
+        this.processMessageQueue();
+        this.onConnected();
+      };
+
+      this.socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleMessage(data);
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error);
+        }
+      };
+
+      this.socket.onclose = (event) => {
+        console.log('WebSocket connection closed:', event.code, event.reason);
+        this.isConnected = false;
+        this.stopHeartbeat();
+        this.onDisconnected();
+        
+        // Attempt reconnection if not a clean close
+        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.scheduleReconnect();
+        }
+      };
+
+      this.socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        this.onError(error);
+      };
+
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
+      this.onError(error);
+    }
+  }
+
+  disconnect() {
+    if (this.socket) {
+      this.socket.close(1000, 'Client disconnect');
+      this.socket = null;
+    }
+    this.isConnected = false;
+    this.stopHeartbeat();
+  }
+
+  scheduleReconnect() {
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    
+    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
+    
+    setTimeout(() => {
+      if (!this.isConnected) {
+        this.connect();
+      }
+    }, delay);
+  }
+
+  startHeartbeat() {
+    this.heartbeatInterval = setInterval(() => {
+      if (this.isConnected) {
+        this.send('ai:heartbeat', {});
+      }
+    }, 30000); // 30 seconds
+  }
+
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  send(event, data) {
+    const message = { event, data, timestamp: new Date().toISOString() };
+    
+    if (this.isConnected && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(message));
+    } else {
+      // Queue message for later
+      this.messageQueue.push(message);
+      
+      // Check for backpressure
+      if (this.messageQueue.length > this.backpressureThreshold) {
+        console.warn('Message queue is full, dropping oldest messages');
+        this.messageQueue = this.messageQueue.slice(-this.backpressureThreshold);
+      }
+    }
+  }
+
+  processMessageQueue() {
+    while (this.messageQueue.length > 0 && this.isConnected) {
+      const message = this.messageQueue.shift();
+      this.socket.send(JSON.stringify(message));
+    }
+  }
+
+  handleMessage(data) {
+    switch (data.type) {
+      case 'connected':
+        console.log('AI WebSocket connected:', data);
+        break;
+        
+      case 'token':
+        this.onToken(data);
+        break;
+        
+      case 'stream_start':
+        this.onStreamStart(data);
+        break;
+        
+      case 'stream_complete':
+        this.onStreamComplete(data);
+        break;
+        
+      case 'stream_error':
+        this.onStreamError(data);
+        break;
+        
+      case 'stream_cancelled':
+        console.log('Stream cancelled:', data);
+        break;
+        
+      case 'done':
+        console.log('Stream done:', data);
+        break;
+        
+      case 'backpressure':
+        this.onBackpressure(data);
+        break;
+        
+      case 'heartbeat_ack':
+        console.log('Heartbeat acknowledged:', data);
+        break;
+        
+      case 'reconnect_success':
+        console.log('Reconnection successful:', data);
+        break;
+        
+      case 'error':
+        this.onError(data);
+        break;
+        
+      default:
+        console.log('Unknown message type:', data.type, data);
+    }
+  }
+
+  // Stream AI request
+  streamAI(prompt, options = {}) {
+    const streamId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const request = {
+      prompt,
+      streamId,
+      model: options.model || 'codellama',
+      temperature: options.temperature || 0.7,
+      maxTokens: options.maxTokens || 2048,
+      useOrchestrator: options.useOrchestrator !== false,
+      agentContext: options.agentContext || {}
+    };
+
+    this.send('ai:stream', request);
+    return streamId;
+  }
+
+  // Cancel stream
+  cancelStream(streamId) {
+    this.send('ai:cancel', { streamId });
+  }
+
+  // Reconnect with previous session
+  reconnect(previousClientId) {
+    this.send('ai:reconnect', { previousClientId });
+  }
+
+  // Get connection status
+  getStatus() {
+    return {
+      isConnected: this.isConnected,
+      url: this.url,
+      reconnectAttempts: this.reconnectAttempts,
+      activeStreams: this.activeStreams.size,
+      queueSize: this.messageQueue.length,
+      backpressureThreshold: this.backpressureThreshold
+    };
+  }
+}
+
+// Example usage and testing
+class AIStreamingDemo {
+  constructor() {
+    this.client = new AIWebSocketClient();
+    this.setupDemoHandlers();
+    this.setupUI();
+  }
+
+  setupDemoHandlers() {
+    let currentStreamId = null;
+    let tokenBuffer = '';
+
+    this.client.onConnected = () => {
+      console.log('✅ Connected to AI WebSocket');
+      this.updateStatus('Connected', 'success');
+    };
+
+    this.client.onDisconnected = () => {
+      console.log('❌ Disconnected from AI WebSocket');
+      this.updateStatus('Disconnected', 'error');
+    };
+
+    this.client.onError = (error) => {
+      console.error('❌ WebSocket error:', error);
+      this.updateStatus(`Error: ${error.message || error}`, 'error');
+    };
+
+    this.client.onToken = (data) => {
+      tokenBuffer += data.data;
+      this.updateTokenDisplay(tokenBuffer);
+      this.updateStreamInfo(data);
+    };
+
+    this.client.onStreamStart = (data) => {
+      currentStreamId = data.streamId;
+      tokenBuffer = '';
+      this.updateStatus(`Stream started: ${data.streamId}`, 'info');
+      this.updateStreamInfo({ streamId: data.streamId, tokenCount: 0 });
+    };
+
+    this.client.onStreamComplete = (data) => {
+      console.log('✅ Stream completed:', data);
+      this.updateStatus(`Stream completed: ${data.agent} (${data.intent})`, 'success');
+      currentStreamId = null;
+    };
+
+    this.client.onStreamError = (data) => {
+      console.error('❌ Stream error:', data);
+      this.updateStatus(`Stream error: ${data.error}`, 'error');
+      currentStreamId = null;
+    };
+
+    this.client.onBackpressure = (data) => {
+      console.warn('⚠️ Backpressure detected:', data);
+      this.updateStatus(`Backpressure: ${data.queueSize} messages queued`, 'warning');
+    };
+  }
+
+  setupUI() {
+    // Create demo UI elements
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div style="padding: 20px; font-family: monospace; max-width: 800px; margin: 0 auto;">
+        <h2>AI WebSocket Streaming Demo</h2>
+        
+        <div id="status" style="padding: 10px; margin: 10px 0; border-radius: 4px; background: #f0f0f0;">
+          Status: Not connected
+        </div>
+        
+        <div style="margin: 10px 0;">
+          <button id="connectBtn">Connect</button>
+          <button id="disconnectBtn" disabled>Disconnect</button>
+          <button id="testBtn" disabled>Test Stream</button>
+        </div>
+        
+        <div style="margin: 10px 0;">
+          <textarea id="promptInput" placeholder="Enter your prompt here..." 
+                    style="width: 100%; height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+Explain how WebSocket streaming works in Node.js applications.
+          </textarea>
+        </div>
+        
+        <div style="margin: 10px 0;">
+          <label>
+            <input type="checkbox" id="useOrchestrator" checked> Use Orchestrator
+          </label>
+          <label>
+            Model: <select id="modelSelect">
+              <option value="codellama">CodeLlama</option>
+              <option value="llama2">Llama 2</option>
+              <option value="mistral">Mistral</option>
+            </select>
+          </label>
+        </div>
+        
+        <div id="streamInfo" style="padding: 10px; margin: 10px 0; background: #f9f9f9; border-radius: 4px;">
+          No active stream
+        </div>
+        
+        <div id="tokenDisplay" style="padding: 10px; margin: 10px 0; background: #fff; border: 1px solid #ddd; border-radius: 4px; min-height: 200px; white-space: pre-wrap;">
+          AI response will appear here...
+        </div>
+        
+        <div style="margin: 10px 0;">
+          <button id="clearBtn">Clear</button>
+          <button id="cancelBtn" disabled>Cancel Stream</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(container);
+    
+    // Setup event listeners
+    document.getElementById('connectBtn').onclick = () => this.client.connect();
+    document.getElementById('disconnectBtn').onclick = () => this.client.disconnect();
+    document.getElementById('testBtn').onclick = () => this.testStream();
+    document.getElementById('clearBtn').onclick = () => this.clearDisplay();
+    document.getElementById('cancelBtn').onclick = () => this.cancelStream();
+    
+    // Enable/disable buttons based on connection status
+    this.updateButtonStates();
+  }
+
+  testStream() {
+    const prompt = document.getElementById('promptInput').value;
+    const useOrchestrator = document.getElementById('useOrchestrator').checked;
+    const model = document.getElementById('modelSelect').value;
+    
+    if (!prompt.trim()) {
+      alert('Please enter a prompt');
+      return;
+    }
+    
+    const streamId = this.client.streamAI(prompt, {
+      useOrchestrator,
+      model,
+      temperature: 0.7,
+      maxTokens: 1000,
+      agentContext: {
+        activeFile: 'demo.js',
+        projectType: 'Node.js'
+      }
+    });
+    
+    console.log('Started stream:', streamId);
+    this.updateButtonStates();
+  }
+
+  cancelStream() {
+    // This would need to track the current stream ID
+    // For demo purposes, we'll just show the action
+    console.log('Cancelling stream...');
+    this.updateStatus('Stream cancelled', 'warning');
+  }
+
+  clearDisplay() {
+    document.getElementById('tokenDisplay').textContent = 'AI response will appear here...';
+    document.getElementById('streamInfo').textContent = 'No active stream';
+  }
+
+  updateStatus(message, type) {
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = `Status: ${message}`;
+    statusEl.style.background = type === 'success' ? '#d4edda' : 
+                                type === 'error' ? '#f8d7da' : 
+                                type === 'warning' ? '#fff3cd' : '#f0f0f0';
+    statusEl.style.color = type === 'success' ? '#155724' : 
+                          type === 'error' ? '#721c24' : 
+                          type === 'warning' ? '#856404' : '#000';
+  }
+
+  updateTokenDisplay(content) {
+    document.getElementById('tokenDisplay').textContent = content;
+  }
+
+  updateStreamInfo(data) {
+    const infoEl = document.getElementById('streamInfo');
+    if (data.streamId) {
+      infoEl.textContent = `Stream: ${data.streamId} | Tokens: ${data.tokenCount || 0} | Agent: ${data.agent || 'Unknown'}`;
+    }
+  }
+
+  updateButtonStates() {
+    const isConnected = this.client.isConnected;
+    document.getElementById('connectBtn').disabled = isConnected;
+    document.getElementById('disconnectBtn').disabled = !isConnected;
+    document.getElementById('testBtn').disabled = !isConnected;
+    document.getElementById('cancelBtn').disabled = !isConnected;
+  }
+}
+
+// Auto-start demo when script loads
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    new AIStreamingDemo();
+  });
+}
+
+// Export for Node.js usage
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AIWebSocketClient, AIStreamingDemo };
+}
+

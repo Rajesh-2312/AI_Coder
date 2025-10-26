@@ -1,0 +1,37 @@
+# Model Placeholder
+
+This file serves as a placeholder for AI model files.
+
+## Expected Model Files
+
+When Ollama models are downloaded, they will be stored in the Ollama directory:
+- `~/.ollama/models/` (Linux/Mac)
+- `%USERPROFILE%\.ollama\models\` (Windows)
+
+## Model Integration
+
+The backend will automatically detect and use available Ollama models based on the configuration in `ollama-config.json`.
+
+## Testing Models
+
+To test if models are working:
+
+1. Start Ollama service:
+   ```bash
+   ollama serve
+   ```
+
+2. Test a model:
+   ```bash
+   ollama run codellama "Write a simple hello world function"
+   ```
+
+3. Check backend logs for model connection status
+
+## Troubleshooting
+
+- Ensure Ollama is running on port 11434
+- Check model availability with `ollama list`
+- Verify network connectivity between backend and Ollama
+- Check Ollama logs for errors
+

@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI WebSocket Streaming Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.streaming {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background-color: #c82333;
+        }
+        
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            background-color: #218838;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        
+        .response-area {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .stat-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .stat-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            color: #007bff;
+        }
+        
+        .log-area {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+        
+        .log-info {
+            color: #007bff;
+        }
+        
+        .log-success {
+            color: #28a745;
+        }
+        
+        .log-error {
+            color: #dc3545;
+        }
+        
+        .log-warning {
+            color: #ffc107;
+        }
+        
+        .options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .option-group label {
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        select, input[type="range"] {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .range-value {
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI WebSocket Streaming Test</h1>
+        
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+        
+        <div class="controls">
+            <button id="connectBtn" class="btn-primary">Connect</button>
+            <button id="disconnectBtn" class="btn-danger" disabled>Disconnect</button>
+            <button id="testBtn" class="btn-success" disabled>Send Prompt</button>
+            <button id="cancelBtn" class="btn-danger" disabled>Cancel Stream</button>
+            <button id="clearBtn" class="btn-primary">Clear</button>
+        </div>
+        
+        <div class="options">
+            <div class="option-group">
+                <label for="promptInput">Prompt:</label>
+                <textarea id="promptInput" rows="3" placeholder="Enter your prompt here...">Write a simple React component that displays a counter with increment and decrement buttons.</textarea>
+            </div>
+            
+            <div class="option-group">
+                <label for="modelSelect">Model:</label>
+                <select id="modelSelect">
+                    <option value="codellama">CodeLlama</option>
+                    <option value="llama2">Llama 2</option>
+                    <option value="mistral">Mistral</option>
+                    <option value="gemma">Gemma</option>
+                </select>
+            </div>
+            
+            <div class="option-group">
+                <label for="temperatureRange">Temperature:</label>
+                <input type="range" id="temperatureRange" min="0" max="2" step="0.1" value="0.7">
+                <div class="range-value" id="temperatureValue">0.7</div>
+            </div>
+            
+            <div class="option-group">
+                <label for="maxTokensRange">Max Tokens:</label>
+                <input type="range" id="maxTokensRange" min="100" max="4000" step="100" value="1000">
+                <div class="range-value" id="maxTokensValue">1000</div>
+            </div>
+            
+            <div class="option-group">
+                <label>
+                    <input type="checkbox" id="useOrchestrator" checked> Use Orchestrator
+                </label>
+                <label>
+                    <input type="checkbox" id="showLogs" checked> Show Logs
+                </label>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">Active Streams</div>
+                <div class="stat-value" id="activeStreams">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Total Tokens</div>
+                <div class="stat-value" id="totalTokens">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Current Agent</div>
+                <div class="stat-value" id="currentAgent">None</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Stream Duration</div>
+                <div class="stat-value" id="streamDuration">0ms</div>
+            </div>
+        </div>
+        
+        <div class="response-area" id="responseArea">
+            AI response will appear here...
+        </div>
+        
+        <div class="log-area" id="logArea" style="display: none;">
+            <div class="log-entry log-info">Logs will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        class AIStreamingTest {
+            constructor() {
+                this.socket = null;
+                this.isConnected = false;
+                this.isStreaming = false;
+                this.currentStreamId = null;
+                this.totalTokens = 0;
+                this.streamStartTime = null;
+                this.activeStreams = 0;
+                
+                this.setupEventListeners();
+                this.setupUI();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('connectBtn').onclick = () => this.connect();
+                document.getElementById('disconnectBtn').onclick = () => this.disconnect();
+                document.getElementById('testBtn').onclick = () => this.sendPrompt();
+                document.getElementById('cancelBtn').onclick = () => this.cancelStream();
+                document.getElementById('clearBtn').onclick = () => this.clearResponse();
+                
+                // Range value updates
+                document.getElementById('temperatureRange').oninput = (e) => {
+                    document.getElementById('temperatureValue').textContent = e.target.value;
+                };
+                
+                document.getElementById('maxTokensRange').oninput = (e) => {
+                    document.getElementById('maxTokensValue').textContent = e.target.value;
+                };
+                
+                // Toggle logs
+                document.getElementById('showLogs').onchange = (e) => {
+                    const logArea = document.getElementById('logArea');
+                    logArea.style.display = e.target.checked ? 'block' : 'none';
+                };
+            }
+            
+            setupUI() {
+                this.updateStatus('Disconnected', 'disconnected');
+                this.updateButtonStates();
+            }
+            
+            connect() {
+                try {
+                    this.socket = io('ws://localhost:3000/ai');
+                    
+                    this.socket.on('connect', () => {
+                        this.isConnected = true;
+                        this.log('Connected to WebSocket', 'success');
+                        this.updateStatus('Connected', 'connected');
+                        this.updateButtonStates();
+                    });
+                    
+                    this.socket.on('ai:connected', (data) => {
+                        this.log(`AI WebSocket ready: ${data.clientId}`, 'info');
+                        this.log(`Max concurrent streams: ${data.maxConcurrentStreams}`, 'info');
+                    });
+                    
+                    this.socket.on('ai:stream:start', (data) => {
+                        this.isStreaming = true;
+                        this.currentStreamId = data.streamId;
+                        this.streamStartTime = Date.now();
+                        this.activeStreams++;
+                        this.log(`Stream started: ${data.streamId}`, 'info');
+                        this.updateStatus('Streaming...', 'streaming');
+                        this.updateButtonStates();
+                        this.updateStats();
+                    });
+                    
+                    this.socket.on('ai:token', (data) => {
+                        this.totalTokens++;
+                        const responseArea = document.getElementById('responseArea');
+                        responseArea.textContent += data.data;
+                        responseArea.scrollTop = responseArea.scrollHeight;
+                        
+                        document.getElementById('currentAgent').textContent = data.agent || 'Unknown';
+                        this.updateStats();
+                        
+                        if (this.totalTokens % 50 === 0) {
+                            this.log(`Received ${this.totalTokens} tokens`, 'info');
+                        }
+                    });
+                    
+                    this.socket.on('ai:stream:complete', (data) => {
+                        this.log(`Stream completed: ${data.agent} (${data.intent})`, 'success');
+                        this.log(`Confidence: ${data.confidence}`, 'info');
+                    });
+                    
+                    this.socket.on('ai:done', (data) => {
+                        this.isStreaming = false;
+                        this.activeStreams--;
+                        const duration = Date.now() - this.streamStartTime;
+                        this.log(`Stream done: ${data.totalTokens} tokens in ${duration}ms`, 'success');
+                        this.updateStatus('Connected', 'connected');
+                        this.updateButtonStates();
+                        this.updateStats();
+                    });
+                    
+                    this.socket.on('ai:stream:cancelled', (data) => {
+                        this.isStreaming = false;
+                        this.activeStreams--;
+                        this.log(`Stream cancelled: ${data.streamId}`, 'warning');
+                        this.updateStatus('Connected', 'connected');
+                        this.updateButtonStates();
+                        this.updateStats();
+                    });
+                    
+                    this.socket.on('ai:error', (data) => {
+                        this.log(`Error: ${data.error}`, 'error');
+                        if (data.details) {
+                            this.log(`Details: ${data.details}`, 'error');
+                        }
+                    });
+                    
+                    this.socket.on('ai:stream:error', (data) => {
+                        this.isStreaming = false;
+                        this.activeStreams--;
+                        this.log(`Stream error: ${data.error}`, 'error');
+                        this.updateStatus('Connected', 'connected');
+                        this.updateButtonStates();
+                        this.updateStats();
+                    });
+                    
+                    this.socket.on('ai:backpressure', (data) => {
+                        this.log(`Backpressure: ${data.message}`, 'warning');
+                    });
+                    
+                    this.socket.on('disconnect', (reason) => {
+                        this.isConnected = false;
+                        this.isStreaming = false;
+                        this.activeStreams = 0;
+                        this.log(`Disconnected: ${reason}`, 'error');
+                        this.updateStatus('Disconnected', 'disconnected');
+                        this.updateButtonStates();
+                        this.updateStats();
+                    });
+                    
+                } catch (error) {
+                    this.log(`Connection failed: ${error.message}`, 'error');
+                }
+            }
+            
+            disconnect() {
+                if (this.socket) {
+                    this.socket.disconnect();
+                    this.socket = null;
+                }
+                this.isConnected = false;
+                this.isStreaming = false;
+                this.activeStreams = 0;
+                this.updateStatus('Disconnected', 'disconnected');
+                this.updateButtonStates();
+                this.updateStats();
+            }
+            
+            sendPrompt() {
+                const prompt = document.getElementById('promptInput').value.trim();
+                if (!prompt) {
+                    alert('Please enter a prompt');
+                    return;
+                }
+                
+                const model = document.getElementById('modelSelect').value;
+                const temperature = parseFloat(document.getElementById('temperatureRange').value);
+                const maxTokens = parseInt(document.getElementById('maxTokensRange').value);
+                const useOrchestrator = document.getElementById('useOrchestrator').checked;
+                
+                const request = {
+                    prompt,
+                    model,
+                    temperature,
+                    maxTokens,
+                    useOrchestrator,
+                    agentContext: {
+                        activeFile: 'App.js',
+                        projectType: 'React'
+                    }
+                };
+                
+                this.log(`Sending prompt: "${prompt.substring(0, 50)}..."`, 'info');
+                this.socket.emit('ai:stream', request);
+            }
+            
+            cancelStream() {
+                if (this.currentStreamId) {
+                    this.socket.emit('ai:cancel', { streamId: this.currentStreamId });
+                    this.log(`Cancelling stream: ${this.currentStreamId}`, 'warning');
+                }
+            }
+            
+            clearResponse() {
+                document.getElementById('responseArea').textContent = 'AI response will appear here...';
+                this.totalTokens = 0;
+                this.updateStats();
+            }
+            
+            updateStatus(message, type) {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = `Status: ${message}`;
+                statusEl.className = `status ${type}`;
+            }
+            
+            updateButtonStates() {
+                document.getElementById('connectBtn').disabled = this.isConnected;
+                document.getElementById('disconnectBtn').disabled = !this.isConnected;
+                document.getElementById('testBtn').disabled = !this.isConnected || this.isStreaming;
+                document.getElementById('cancelBtn').disabled = !this.isConnected || !this.isStreaming;
+            }
+            
+            updateStats() {
+                document.getElementById('activeStreams').textContent = this.activeStreams;
+                document.getElementById('totalTokens').textContent = this.totalTokens;
+                
+                if (this.streamStartTime && this.isStreaming) {
+                    const duration = Date.now() - this.streamStartTime;
+                    document.getElementById('streamDuration').textContent = `${duration}ms`;
+                } else {
+                    document.getElementById('streamDuration').textContent = '0ms';
+                }
+            }
+            
+            log(message, type = 'info') {
+                const logArea = document.getElementById('logArea');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry log-${type}`;
+                logEntry.textContent = `[${timestamp}] ${message}`;
+                
+                logArea.appendChild(logEntry);
+                logArea.scrollTop = logArea.scrollHeight;
+                
+                // Keep only last 100 log entries
+                while (logArea.children.length > 100) {
+                    logArea.removeChild(logArea.firstChild);
+                }
+            }
+        }
+        
+        // Initialize the test when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            new AIStreamingTest();
+        });
+    </script>
+</body>
+</html>
+

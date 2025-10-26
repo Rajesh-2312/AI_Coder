@@ -1,0 +1,57 @@
+{
+  "sandbox": {
+    "tempDirectory": "./sandbox/temp",
+    "logDirectory": "./sandbox/logs",
+    "maxExecutionTime": 30000,
+    "maxConcurrentProcesses": 5,
+    "maxOutputLength": 10000,
+    "allowedCommands": [
+      "node",
+      "npm",
+      "npx",
+      "yarn",
+      "git",
+      "ls",
+      "pwd",
+      "cat",
+      "echo",
+      "mkdir",
+      "rmdir",
+      "touch",
+      "cp",
+      "mv",
+      "grep",
+      "find",
+      "which",
+      "type",
+      "python",
+      "python3",
+      "bash",
+      "sh"
+    ],
+    "restrictedCommands": [
+      "rm",
+      "del",
+      "format",
+      "fdisk",
+      "mkfs",
+      "dd",
+      "sudo",
+      "su",
+      "chmod",
+      "chown"
+    ],
+    "environment": {
+      "NODE_ENV": "sandbox",
+      "SANDBOX_MODE": "true"
+    },
+    "security": {
+      "enableLogging": true,
+      "enableAudit": true,
+      "maxFileSize": 10485760,
+      "allowedFileTypes": [".js", ".ts", ".py", ".json", ".txt", ".md"],
+      "blockedFileTypes": [".exe", ".bat", ".cmd", ".sh", ".ps1"]
+    }
+  }
+}
+

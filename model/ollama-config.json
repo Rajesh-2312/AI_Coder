@@ -1,0 +1,42 @@
+{
+  "ollama": {
+    "baseUrl": "http://localhost:11434",
+    "models": {
+      "codeGeneration": {
+        "name": "codellama",
+        "description": "Code generation and completion model",
+        "parameters": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 2048
+        }
+      },
+      "codeAnalysis": {
+        "name": "llama2",
+        "description": "Code analysis and review model",
+        "parameters": {
+          "temperature": 0.3,
+          "top_p": 0.8,
+          "max_tokens": 1024
+        }
+      },
+      "chatAssistant": {
+        "name": "mistral",
+        "description": "General purpose chat assistant",
+        "parameters": {
+          "temperature": 0.5,
+          "top_p": 0.9,
+          "max_tokens": 1024
+        }
+      }
+    },
+    "timeout": 30000,
+    "retries": 3
+  },
+  "fallback": {
+    "enabled": true,
+    "useLocalAnalysis": true,
+    "message": "AI models not available, using local analysis"
+  }
+}
+
