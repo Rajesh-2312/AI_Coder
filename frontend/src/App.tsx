@@ -4,10 +4,9 @@ import { trainingService } from './services/trainingService'
 import TrainingPanel from './components/TrainingPanel'
 import { useAuth } from './context/AuthContext'
 import { AuthModal } from './components/Auth/AuthModal'
+import { UserProfileDropdown } from './components/UserProfileDropdown'
 
 function App() {
-  const { user, loading, signOut } = useAuth()
-  const [showAuth, setShowAuth] = useState(false)
   const [activeFile, setActiveFile] = useState('App.tsx')
   const [codeContent, setCodeContent] = useState(`// Welcome to AI-Coder!
 // Start coding with AI assistance
@@ -701,15 +700,7 @@ body {
           <button className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600">
             Help
           </button>
-          <button 
-            onClick={async () => {
-              await signOut()
-              setShowAuth(true)
-            }}
-            className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
-          >
-            Logout
-          </button>
+          <UserProfileDropdown />
         </div>
       </div>
                     
