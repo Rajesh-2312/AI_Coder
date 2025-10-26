@@ -848,7 +848,24 @@ body {
           className="border-l border-gray-300 bg-white p-4 flex flex-col"
           style={{ width: `${panelSizes.chat}%` }}
         >
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">AI Chat</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-semibold text-gray-700">AI Chat</h2>
+            <div className="flex items-center gap-2 text-xs text-gray-600 bg-green-50 px-2 py-1 rounded border border-green-200">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="font-medium">Port 3001</span>
+            </div>
+          </div>
+          <div className="mb-2 text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+            <span className="font-medium">🌐 Running at: </span>
+            <a 
+              href="http://localhost:3001" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              http://localhost:3001
+            </a>
+          </div>
           <div className="flex-1 flex flex-col">
             <div 
               ref={chatMessagesRef}
