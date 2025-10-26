@@ -2,8 +2,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { aiService } from './services/aiService'
 import { trainingService } from './services/trainingService'
 import TrainingPanel from './components/TrainingPanel'
+import { useAuth } from './context/AuthContext'
+import { AuthModal } from './components/Auth/AuthModal'
 
 function App() {
+  const { user, loading, signOut } = useAuth()
+  const [showAuth, setShowAuth] = useState(false)
   const [activeFile, setActiveFile] = useState('App.tsx')
   const [codeContent, setCodeContent] = useState(`// Welcome to AI-Coder!
 // Start coding with AI assistance
@@ -697,6 +701,15 @@ body {
           <button className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600">
             Help
           </button>
+          <button 
+            onClick={async () => {
+              await signOut()
+              setShowAuth(true)
+            }}
+            className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Logout
+          </button>
         </div>
       </div>
                     
@@ -943,4 +956,32 @@ body {
   )
 }
 
-export default App
+// Wrap App with authentication check
+const AppWithAuth = () => {
+  const { user, loading } = useAuth()
+  const [showAuth, setShowAuth] = useState(!user && !loading)
+
+  useEffect(() => {
+    if (user) {
+      setShowAuth(false)
+    } else if (!loading) {
+      setShowAuth(true)
+    }
+  }, [user, loading])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
+
+  if (showAuth || !user) {
+    return <AuthModal onAuthSuccess={() => setShowAuth(false)} />
+  }
+
+  return <App />
+}
+
+export default AppWithAuth
