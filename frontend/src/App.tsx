@@ -31,6 +31,8 @@ export default hello;`)
   const [isTypingCommand, setIsTypingCommand] = useState(false)
   const [isAIActive, setIsAIActive] = useState(false)
   const [showTrainingPanel, setShowTrainingPanel] = useState(false)
+  const [runningProjectUrl, setRunningProjectUrl] = useState<string | null>(null)
+  const [runningProjectName, setRunningProjectName] = useState<string | null>(null)
 
   // Refs for auto-scrolling
   const chatMessagesRef = useRef<HTMLDivElement>(null)
@@ -452,16 +454,27 @@ export default App`
           if (devResult.success) {
             addTerminalOutput('✓ Frontend development server started successfully')
             addAIMessage('🎉 Project created! Running in development mode.')
-            addAIMessage('🌐 Check your browser for the project URL')
+            
+            // Set the running project URL
+            const projectUrl = 'http://localhost:3001'
+            setRunningProjectUrl(projectUrl)
+            setRunningProjectName('TicTacToe Game')
+            addAIMessage(`🌐 Project running at: ${projectUrl}`)
           } else {
             // Check for port conflict errors
             const errorOutput = devResult.stderr || devResult.error || ''
             if (errorOutput.includes('EADDRINUSE') || errorOutput.includes('address already in use')) {
               addTerminalOutput('⚠️ Port conflict detected - development server already running')
               addTerminalOutput('💡 The frontend development server is already running')
+              
+              // Set the running project URL even if already running
+              const projectUrl = 'http://localhost:3001'
+              setRunningProjectUrl(projectUrl)
+              setRunningProjectName('TicTacToe Game')
+              
               addAIMessage('🎉 Project created successfully!')
-              addAIMessage('🌐 Your project is available in your browser')
-              addAIMessage('💡 The development server was already running, so no need to start it again.')
+              addAIMessage(`🌐 Project running at: ${projectUrl}`)
+              addAIMessage('💡 The development server was already running')
             } else {
               addTerminalOutput(`❌ Frontend development server failed: ${errorOutput}`)
               addAIMessage('❌ Both build and development mode failed. Check the terminal for details.')
@@ -850,22 +863,26 @@ body {
         >
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold text-gray-700">AI Chat</h2>
-            <div className="flex items-center gap-2 text-xs text-gray-600 bg-green-50 px-2 py-1 rounded border border-green-200">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="font-medium">Port 3001</span>
+            {runningProjectUrl && (
+              <div className="flex items-center gap-2 text-xs text-gray-600 bg-green-50 px-2 py-1 rounded border border-green-200">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="font-medium">{runningProjectName || 'Project'}</span>
+              </div>
+            )}
+          </div>
+          {runningProjectUrl && (
+            <div className="mb-2 text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+              <span className="font-medium">🌐 Running at: </span>
+              <a 
+                href={runningProjectUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                {runningProjectUrl}
+              </a>
             </div>
-          </div>
-          <div className="mb-2 text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
-            <span className="font-medium">🌐 Running at: </span>
-            <a 
-              href="http://localhost:3001" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              http://localhost:3001
-            </a>
-          </div>
+          )}
           <div className="flex-1 flex flex-col">
             <div 
               ref={chatMessagesRef}
