@@ -33,13 +33,15 @@ class AIService {
 
   async createFile(path: string, content: string): Promise<boolean> {
     try {
-      await axios.post(`${this.baseURL}/api/files/write`, {
+      console.log(`📝 Creating file: ${path} (${content.length} bytes)`)
+      const response = await axios.post(`${this.baseURL}/api/files/write`, {
         filePath: path,
         content
       })
+      console.log(`✅ File created successfully: ${path}`, response.data)
       return true
     } catch (error) {
-      console.error('File Create Error:', error)
+      console.error('❌ File Create Error:', error)
       return false
     }
   }

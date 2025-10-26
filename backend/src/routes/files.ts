@@ -76,6 +76,7 @@ router.post('/write', async (req, res) => {
     }
 
     const { filePath, content } = value;
+    console.log(`📝 Writing file: ${filePath} (${content?.length || 0} bytes)`);
     const normalizedPath = validateFilePath(filePath);
     
     // Ensure directory exists
@@ -83,9 +84,10 @@ router.post('/write', async (req, res) => {
     await fs.mkdir(dir, { recursive: true });
     
     await fs.writeFile(normalizedPath, content, 'utf-8');
+    console.log(`✅ File written successfully: ${normalizedPath}`);
     res.json({ success: true, filePath: normalizedPath });
     } catch (error: any) {
-    console.error('Write file error:', error);
+    console.error('❌ Write file error:', error);
     res.status(500).json({ error: 'Failed to write file' });
   }
 });
