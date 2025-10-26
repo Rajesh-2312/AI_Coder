@@ -447,19 +447,20 @@ export default App`
           addAIMessage('🔍 Common issues: JSX syntax errors, missing imports, or file extensions')
           addAIMessage('💡 Trying development mode instead (more forgiving)...')
           
-          // Try development mode as fallback
-          addTerminalOutput('$ npm run dev')
-          const devResult = await aiService.executeCommand('npm run dev', 'frontend', 10000, 'Start frontend development server')
+          // Try test mode as fallback (runs on port 3002)
+          addTerminalOutput('$ npm run dev:test')
+          const devResult = await aiService.executeCommand('npm run dev:test', 'frontend', 15000, 'Start test server on port 3002')
           
           if (devResult.success) {
             addTerminalOutput('✓ Frontend development server started successfully')
             addAIMessage('🎉 Project created! Running in development mode.')
             
-            // Set the running project URL
-            const projectUrl = 'http://localhost:3001'
+            // Set the running project URL on a different port for testing
+            const projectUrl = 'http://localhost:3002'
             setRunningProjectUrl(projectUrl)
             setRunningProjectName('TicTacToe Game')
             addAIMessage(`🌐 Project running at: ${projectUrl}`)
+            addAIMessage('💡 Open this URL in a new tab to test your project!')
           } else {
             // Check for port conflict errors
             const errorOutput = devResult.stderr || devResult.error || ''
@@ -467,14 +468,14 @@ export default App`
               addTerminalOutput('⚠️ Port conflict detected - development server already running')
               addTerminalOutput('💡 The frontend development server is already running')
               
-              // Set the running project URL even if already running
-              const projectUrl = 'http://localhost:3001'
+              // Set the running project URL on a different port for testing
+              const projectUrl = 'http://localhost:3002'
               setRunningProjectUrl(projectUrl)
               setRunningProjectName('TicTacToe Game')
               
               addAIMessage('🎉 Project created successfully!')
               addAIMessage(`🌐 Project running at: ${projectUrl}`)
-              addAIMessage('💡 The development server was already running')
+              addAIMessage('💡 Open this URL in a new tab to test your project!')
             } else {
               addTerminalOutput(`❌ Frontend development server failed: ${errorOutput}`)
               addAIMessage('❌ Both build and development mode failed. Check the terminal for details.')

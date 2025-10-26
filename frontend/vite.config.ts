@@ -61,7 +61,7 @@ export default defineConfig({
   },
   // Development server optimization
   server: {
-    port: 3001,
+    port: 3001, // Main AI-Coder application port
     host: true,
     // Enable HMR for better development experience
     hmr: {
@@ -75,7 +75,7 @@ export default defineConfig({
   },
   // Preview server optimization
   preview: {
-    port: 3002,
+    port: 3002, // AI-created projects will run on this port for testing
     host: true
   },
   // Optimize dependencies
