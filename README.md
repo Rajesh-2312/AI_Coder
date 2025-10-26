@@ -1,19 +1,42 @@
-# AI-Coder Development Environment
+# AI-Coder: Intelligent Code Assistant Platform
 
-## Prerequisites
+An AI-powered development environment that combines an intelligent code editor, AI agents, and a flexible file management system. Built with React, TypeScript, Express, and integrating with Ollama AI models.
+
+[![GitHub Repository](https://img.shields.io/badge/GitHub-AI_Coder-blue)](https://github.com/Rajesh-2312/AI_Coder.git)
+
+## 🌟 Features
+
+- **Intelligent Code Editor**: Monaco Editor with syntax highlighting and AI assistance
+- **AI Agents**: Autonomous agents that can create, update, and delete files
+- **Real-time File Explorer**: Live updates when AI agents modify files
+- **Terminal Integration**: Execute commands automatically for project setup
+- **WebSocket Communication**: Real-time bidirectional communication
+- **Flexible UI**: Drag-to-resize panels for optimal workflow
+- **AI Chat Panel**: Transparent agent activity logging
+- **Training System**: Train AI models for specific project patterns
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 - Node.js 18.0.0 or higher
 - npm or yarn package manager
 - Git
-- Ollama (for AI features)
+- Ollama (for AI features - see [Ollama Setup](#ollama-setup))
 
-## Quick Start
+### Installation
 
-1. **Clone and install dependencies:**
+1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
-   cd ai-coder
+   git clone https://github.com/Rajesh-2312/AI_Coder.git
+   cd AI_Coder
+   ```
+
+2. **Install dependencies:**
+   ```bash
    npm install
+   cd backend && npm install
+   cd ../frontend && npm install
    ```
 
 2. **Start development servers:**
