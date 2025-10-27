@@ -73,9 +73,12 @@ class AIService {
 
   async getFileContent(path: string): Promise<string> {
     try {
+      console.log('Loading file content:', path)
       const response = await axios.get(`${this.baseURL}/api/files/read`, {
         params: { filePath: path }
       })
+      console.log('File content response:', response.data)
+      // Response has structure: { content: string, filePath: string }
       return response.data.content || ''
     } catch (error) {
       console.error('File Read Error:', error)
@@ -117,6 +120,26 @@ class AIService {
         error: error instanceof Error ? error.message : 'Unknown error',
         stdout: '',
         stderr: 'Failed to execute command'
+      }
+    }
+  }
+
+  async executeProject(description: string): Promise<AIResponse> {
+    try {
+      const response = await axios.post(`${this.baseURL}/api/ai/execute-project`, {
+        description
+      })
+      return {
+        success: response.data.success || true,
+        content: response.data.plan || response.data.response || 'No plan generated',
+        error: response.data.error
+      }
+    } catch (error) {
+      console.error('Execute Project Error:', error)
+      return {
+        success: false,
+        content: 'Failed to generate project plan',
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }

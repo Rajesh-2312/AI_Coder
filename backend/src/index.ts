@@ -12,6 +12,10 @@ import path from 'path'
 import aiRoutes from './routes/ai'
 import filesRoutes from './routes/files'
 import executeRoutes from './routes/execute'
+import modelDownloadRoutes from './routes/modelDownload'
+import trainingRoutes from './routes/training'
+import agentsRoutes from './routes/agents'
+import autoFixRoutes from './routes/autoFix'
 
 // Load environment variables
 dotenv.config()
@@ -71,6 +75,10 @@ app.use('/static', express.static(path.join(__dirname, '../public')))
 app.use('/api/ai', aiRoutes)
 app.use('/api/files', filesRoutes)
 app.use('/api/execute', executeRoutes)
+app.use('/api/model', modelDownloadRoutes)
+app.use('/api/training', trainingRoutes)
+app.use('/api/agents', agentsRoutes)
+app.use('/api/ai', autoFixRoutes)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

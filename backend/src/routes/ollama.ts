@@ -8,7 +8,7 @@ router.get('/config', async (req, res) => {
   try {
     await ollamaConfigManager.loadConfig();
     const config = ollamaConfigManager.getConfig();
-    res.json({
+    return res.json({
       success: true,
       config,
       activeServer: ollamaConfigManager.getActiveServer(),
@@ -37,7 +37,7 @@ router.post('/test-connection', async (req, res) => {
     const isConnected = await ollamaConfigManager.testServerConnection(serverUrl);
     const models = isConnected ? await ollamaConfigManager.getAvailableModels(serverUrl) : [];
 
-    res.json({
+    return res.json({
       success: true,
       connected: isConnected,
       models,
@@ -75,7 +75,7 @@ router.post('/configure-external', async (req, res) => {
     // Configure external server
     await ollamaConfigManager.setExternalServer(serverUrl, modelName);
     
-    res.json({
+    return res.json({
       success: true,
       message: 'External server configured successfully',
       serverUrl,
@@ -95,7 +95,7 @@ router.post('/switch-external', async (req, res) => {
     await ollamaConfigManager.switchToExternalServer();
     const activeServer = ollamaConfigManager.getActiveServer();
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Switched to external Ollama server',
       activeServer,
@@ -115,7 +115,7 @@ router.post('/switch-local', async (req, res) => {
     await ollamaConfigManager.switchToLocalServer();
     const activeServer = ollamaConfigManager.getActiveServer();
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Switched to local Ollama server',
       activeServer,
@@ -135,7 +135,7 @@ router.get('/models', async (req, res) => {
     const activeServer = ollamaConfigManager.getActiveServer();
     const models = await ollamaConfigManager.getAvailableModels(activeServer.url);
     
-    res.json({
+    return res.json({
       success: true,
       models,
       activeServer: activeServer.url

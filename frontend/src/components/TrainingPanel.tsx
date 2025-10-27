@@ -263,7 +263,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onClose }) => {
             type="text"
             value={testInput}
             onChange={(e) => setTestInput(e.target.value)}
-            placeholder="e.g., create a tic-tac-toe game"
+            placeholder="e.g., create a todo app"
             className="w-full px-3 py-2 border border-border rounded bg-background text-foreground"
           />
         </div>

@@ -22,193 +22,139 @@ const analyzeSchema = Joi.object({
 })
 
 const taskSchema = Joi.object({
-  task: Joi.string().required().min(1).max(5000),
+  description: Joi.string().required().min(1).max(5000),
   context: Joi.string().optional().max(10000)
 })
 
-// Simple AI response generator
-const generateAIResponse = async (prompt: string): Promise<string> => {
-  // Simple fallback responses for common tasks
-  if (prompt.toLowerCase().includes('tic-tac-toe') || prompt.toLowerCase().includes('tic tac toe')) {
-    return JSON.stringify({
-      projectType: 'tic-tac-toe',
-      files: [
-        {
-          path: 'src/components/TicTacToe.tsx',
-          content: `import React, { useState } from 'react';
-
-interface TicTacToeProps {}
-
-const TicTacToe: React.FC<TicTacToeProps> = () => {
-  const [board, setBoard] = useState<string[]>(Array(9).fill(''));
-  const [currentPlayer, setCurrentPlayer] = useState<'X' | 'O'>('X');
-  const [winner, setWinner] = useState<string | null>(null);
-
-  const checkWinner = (squares: string[]): string | null => {
-    const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-      [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
-      [0, 4, 8], [2, 4, 6] // diagonals
-    ];
-
-    for (let i = 0; i < lines.length; i++) {
-      const [a, b, c] = lines[i];
-      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-        return squares[a];
+// Generic project plan generator - works for ANY project type
+const generateProjectPlan = (description: string) => {
+  const lowerDesc = description.toLowerCase()
+  
+  // Extract project name and features
+  const extractProjectName = (desc: string): string => {
+    const patterns = [
+      /create\s+an?\s+([a-z\s]+)\s+(app|game|project|tool|widget)/i,
+      /build\s+an?\s+([a-z\s]+)\s+(app|game|project|tool|widget)/i,
+      /make\s+an?\s+([a-z\s]+)\s+(app|game|project|tool|widget)/i,
+      /(?:a|an|the)\s+([a-z\s]+)\s+(app|game|project|tool|widget)/i
+    ]
+    
+    for (const pattern of patterns) {
+      const match = desc.match(pattern)
+      if (match) {
+        return match[1].trim()
       }
     }
-    return null;
-  };
+    
+    // Fallback: extract words that sound like a project
+    const words = desc.split(' ').filter(w => w.length > 2)
+    return words.slice(0, 3).join(' ').toLowerCase()
+  }
+  
+  const projectName = extractProjectName(description)
+  const componentName = projectName.split(' ').map(w => 
+    w.charAt(0).toUpperCase() + w.slice(1)
+  ).join('')
+  
+  // Detect technology stack
+  let technologies: string[] = ['React', 'TypeScript']
+  const dependencies: string[] = ['react', 'typescript', '@types/react']
+  
+  if (lowerDesc.includes('tailwind') || lowerDesc.includes('styling')) {
+    technologies.push('TailwindCSS')
+    dependencies.push('tailwindcss')
+  }
+  
+  // Generate generic React component
+  const componentContent = `import React${projectName.includes('state') || projectName.includes('interactive') ? ', { useState }' : ''} from 'react'
 
-  const handleClick = (index: number) => {
-    if (board[index] || winner) return;
+${projectName.includes('interface') || projectName.includes('props') ? `interface ${componentName}Props {
+  // Add props here
+}
 
-    const newBoard = [...board];
-    newBoard[index] = currentPlayer;
-    setBoard(newBoard);
-
-    const gameWinner = checkWinner(newBoard);
-    if (gameWinner) {
-      setWinner(gameWinner);
-    } else {
-      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
-    }
-  };
-
-  const resetGame = () => {
-    setBoard(Array(9).fill(''));
-    setCurrentPlayer('X');
-    setWinner(null);
-  };
-
-  return (
-    <div className="tic-tac-toe">
-      <h2>Tic Tac Toe</h2>
-      <div className="game-info">
-        {winner ? (
-          <p>Winner: {winner}</p>
-        ) : (
-          <p>Current Player: {currentPlayer}</p>
-        )}
-      </div>
-      <div className="board">
-        {board.map((cell, index) => (
-          <button
-            key={index}
-            className="cell"
-            onClick={() => handleClick(index)}
-            disabled={!!cell || !!winner}
-          >
-            {cell}
-          </button>
-        ))}
-      </div>
-      <button onClick={resetGame} className="reset-btn">
-        Reset Game
-      </button>
+` : ''}const ${componentName}: React.FC${projectName.includes('interface') ? `<${componentName}Props>` : ''} = () => {
+${projectName.includes('state') || projectName.includes('interactive') ? `  const [value, setValue] = React.useState('')\n  \n` : ''}  return (
+    <div className="${lowerDesc.replace(/\s+/g, '-')}-container">
+      <h1>${componentName}</h1>
+      <p>This is a new ${projectName} component created by AI</p>
+      {/* Add your component logic here */}
     </div>
-  );
-};
+  )
+}
 
-export default TicTacToe;`,
-          operation: 'create'
-        },
-        {
-          path: 'src/App.tsx',
-          content: `import React from 'react';
-import TicTacToe from './components/TicTacToe';
-import './App.css';
+export default ${componentName}`
+  
+  // Determine which file operations to perform
+  const files = [
+    {
+      type: 'create' as const,
+      path: `src/components/${componentName}.tsx`,
+      content: componentContent,
+      reason: `Create ${componentName} component for ${projectName}`
+    },
+    {
+      type: 'update' as const,
+      path: 'src/App.tsx',
+      content: `import React from 'react'
+import ${componentName} from './components/${componentName}'
+import './App.css'
 
 function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>AI-Coder Tic Tac Toe</h1>
-        <TicTacToe />
+        <h1>${componentName}</h1>
+        <${componentName} />
       </header>
     </div>
-  );
+  )
 }
 
-export default App;`,
-          operation: 'update'
-        },
-        {
-          path: 'src/App.css',
-          content: `.App {
-  text-align: center;
-  padding: 20px;
-}
-
-.tic-tac-toe {
-  margin: 20px auto;
-  max-width: 400px;
-}
-
-.game-info {
-  margin: 20px 0;
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.board {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  margin: 20px auto;
-  max-width: 300px;
-}
-
-.cell {
-  width: 80px;
-  height: 80px;
-  font-size: 24px;
-  font-weight: bold;
-  border: 2px solid #333;
-  background: #fff;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.cell:hover {
-  background-color: #f0f0f0;
-}
-
-.cell:disabled {
-  cursor: not-allowed;
-  background-color: #e0e0e0;
-}
-
-.reset-btn {
-  margin-top: 20px;
-  padding: 10px 20px;
-  font-size: 16px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.reset-btn:hover {
-  background-color: #0056b3;
-}`,
-          operation: 'create'
-        }
-      ],
-      commands: [
-        { command: 'npm install', workingDirectory: 'frontend' },
-        { command: 'npm run dev', workingDirectory: 'frontend' }
-      ]
-    });
+export default App`,
+      reason: 'Update App.tsx to use the new component'
+    }
+  ]
+  
+  // Generate commands
+  const commands = [
+    {
+      command: 'npm install',
+      workingDirectory: 'frontend',
+      timeout: 30000,
+      description: 'Install dependencies'
+    },
+    {
+      command: 'npm run build',
+      workingDirectory: 'frontend',
+      timeout: 60000,
+      description: 'Build the project'
+    }
+  ]
+  
+  // Instructions based on detected features
+  const instructions: string[] = []
+  
+  if (lowerDesc.includes('todo') || lowerDesc.includes('task')) {
+    instructions.push('Implement todo list functionality with add, complete, and delete operations')
+  } else if (lowerDesc.includes('calc') || lowerDesc.includes('calculator')) {
+    instructions.push('Implement calculator with basic arithmetic operations')
+  } else if (lowerDesc.includes('counter') || lowerDesc.includes('count')) {
+    instructions.push('Implement counter with increment and decrement')
+  } else if (lowerDesc.includes('timer') || lowerDesc.includes('clock')) {
+    instructions.push('Implement timer or clock functionality')
+  } else {
+    instructions.push(`Implement ${projectName} functionality`)
   }
   
-  return JSON.stringify({
-    message: "I can help you create projects! Try asking me to create a tic-tac-toe game or another project.",
-    files: [],
-    commands: []
-  });
-};
+  return {
+    projectType: componentName,
+    technologies,
+    files,
+    dependencies,
+    instructions,
+    commands
+  }
+}
 
 // POST /api/ai/generate - Generate AI response
 router.post('/generate', async (req, res) => {
@@ -219,15 +165,17 @@ router.post('/generate', async (req, res) => {
     }
 
     const { prompt } = value;
-    const response = await generateAIResponse(prompt);
-    
-    res.json({
-      response,
-      timestamp: new Date().toISOString()
+
+      return res.json({
+      success: true,
+      content: `AI response for: ${prompt}`,
+        timestamp: new Date().toISOString()
     });
+    return
   } catch (err) {
     console.error('AI generation error:', err);
     res.status(500).json({ error: 'Failed to generate AI response' });
+    return
   }
 });
 
@@ -240,8 +188,8 @@ router.post('/analyze', async (req, res) => {
     }
 
     const { code, language, analysisType } = value;
-    
-    res.json({
+
+    return res.json({
       analysis: {
         language,
         type: analysisType,
@@ -264,23 +212,24 @@ router.post('/execute-project', async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { task } = value;
-    const response = await generateAIResponse(task);
+    const { description } = value;
+    const plan = generateProjectPlan(description);
     
-    res.json({
-      project: JSON.parse(response),
+    return res.json({
+      success: true,
+      plan: plan,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
     console.error('Project execution error:', err);
-    res.status(500).json({ error: 'Failed to execute project' });
+    return res.status(500).json({ error: 'Failed to execute project' });
   }
 });
 
 // GET /api/ai/models - Get available models
 router.get('/models', async (req, res) => {
   try {
-    res.json({
+    return res.json({
       models: [
         { name: 'qwen2.5-coder:1.5b', description: 'Code generation model' },
         { name: 'llama3.2:3b', description: 'General purpose model' }
@@ -296,9 +245,9 @@ router.get('/models', async (req, res) => {
 // GET /api/ai/status - Get AI status
 router.get('/status', async (req, res) => {
   try {
-    res.json({
+    return res.json({
       status: 'ready',
-      timestamp: new Date().toISOString(),
+                timestamp: new Date().toISOString(),
       uptime: process.uptime()
     });
   } catch (err) {

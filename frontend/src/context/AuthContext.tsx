@@ -27,6 +27,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false)
     })
 
+    // Handle OAuth callbacks
+    const handleAuthCallback = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const error = hashParams.get('error')
+      const error_description = hashParams.get('error_description')
+      
+      if (error) {
+        console.error('Auth error:', error, error_description)
+        // Redirect to home without hash
+        window.location.href = window.location.origin
+        return
+      }
+    }
+
+    handleAuthCallback()
+
     // Listen for auth changes
     const {
       data: { subscription },
@@ -34,6 +50,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+      
+      // Clear hash after auth state change
+      if (session && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname)
+      }
     })
 
     return () => subscription.unsubscribe()

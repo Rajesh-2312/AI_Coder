@@ -20,15 +20,27 @@ export const SetupWindow: React.FC<SetupWindowProps> = ({ onSetupComplete }) => 
 
   useEffect(() => {
     // Start setup process
-    window.electronAPI.startSetup((setupProgress: SetupProgress) => {
-      setProgress(setupProgress);
-      
-      if (setupProgress.stage === 'complete') {
+    if (window.electronAPI && typeof (window.electronAPI as any).startSetup === 'function') {
+      (window.electronAPI as any).startSetup((setupProgress: SetupProgress) => {
+        setProgress(setupProgress);
+        
+        if (setupProgress.stage === 'complete') {
+          setTimeout(() => {
+            onSetupComplete();
+          }, 2000); // Show completion message for 2 seconds
+        }
+      });
+    } else {
+      // Fallback: simulate setup for web
+      const simulateSetup = async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setProgress({ stage: 'complete', message: 'Setup complete!' });
         setTimeout(() => {
           onSetupComplete();
-        }, 2000); // Show completion message for 2 seconds
-      }
-    });
+        }, 2000);
+      };
+      simulateSetup();
+    }
   }, [onSetupComplete]);
 
   const getStageIcon = () => {
@@ -123,7 +135,11 @@ export const SetupWindow: React.FC<SetupWindowProps> = ({ onSetupComplete }) => 
                   {progress.error}
                 </p>
                 <button
-                  onClick={() => window.electronAPI.retrySetup()}
+                  onClick={() => {
+                    if (window.electronAPI && typeof (window.electronAPI as any).retrySetup === 'function') {
+                      (window.electronAPI as any).retrySetup();
+                    }
+                  }}
                   className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
                 >
                   Retry Setup

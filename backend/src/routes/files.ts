@@ -40,8 +40,10 @@ router.get('/list', async (req, res) => {
     const { directory = '.' } = req.query;
     const normalizedDir = validateFilePath(directory as string);
     
-    const files = await listFiles(normalizedDir);
-    res.json({ files });
+    // Resolve absolute path from project root
+    const absoluteDir = path.join(process.cwd(), normalizedDir);
+    const files = await listFiles(absoluteDir);
+    return res.json({ files });
   } catch (error: any) {
     console.error('List files error:', error);
     res.status(400).json({ error: error.message });
@@ -59,8 +61,10 @@ router.get('/read', async (req, res) => {
     const { filePath } = value;
     const normalizedPath = validateFilePath(filePath);
     
-    const content = await fs.readFile(normalizedPath, 'utf-8');
-    res.json({ content, filePath: normalizedPath });
+    // Resolve absolute path from project root
+    const absolutePath = path.join(process.cwd(), normalizedPath);
+    const content = await fs.readFile(absolutePath, 'utf-8');
+    return res.json({ content, filePath: normalizedPath });
   } catch (error: any) {
     console.error('Read file error:', error);
     res.status(404).json({ error: 'File not found' });
@@ -77,18 +81,41 @@ router.post('/write', async (req, res) => {
 
     const { filePath, content } = value;
     console.log(`📝 Writing file: ${filePath} (${content?.length || 0} bytes)`);
-    const normalizedPath = validateFilePath(filePath);
+    
+    // Determine final path BEFORE normalizing
+    // Convert backslashes to forward slashes for consistent handling
+    let cleanPath = filePath.replace(/\\/g, '/');
+    let finalPath = cleanPath;
+    
+    // ALWAYS ensure path is under frontend/ for project files
+    // If path starts with 'src/' or 'components/' or is just a filename
+    // prepend 'frontend/src/' if not already under frontend
+    if (!cleanPath.startsWith('frontend/')) {
+      if (cleanPath.startsWith('src/')) {
+        finalPath = 'frontend/' + cleanPath;
+      } else if (cleanPath.startsWith('components/')) {
+        finalPath = 'frontend/src/' + cleanPath;
+      } else if (!cleanPath.includes('frontend') && !cleanPath.includes('backend')) {
+        // Generic filename - assume it's for frontend/src/
+        finalPath = 'frontend/src/' + cleanPath;
+      }
+    }
+    
+    // Now normalize the path
+    const normalizedPath = path.normalize(finalPath);
     
     // Ensure directory exists
-    const dir = path.dirname(normalizedPath);
+    const dir = path.dirname(finalPath);
     await fs.mkdir(dir, { recursive: true });
     
-    await fs.writeFile(normalizedPath, content, 'utf-8');
-    console.log(`✅ File written successfully: ${normalizedPath}`);
-    res.json({ success: true, filePath: normalizedPath });
+    // Write to file (absolute path based on project root)
+    const absolutePath = path.join(process.cwd(), finalPath);
+    await fs.writeFile(absolutePath, content, 'utf-8');
+    console.log(`✅ File written successfully: ${absolutePath}`);
+    return res.json({ success: true, filePath: finalPath });
     } catch (error: any) {
     console.error('❌ Write file error:', error);
-    res.status(500).json({ error: 'Failed to write file' });
+    return res.status(500).json({ error: 'Failed to write file' });
   }
 });
 
@@ -108,10 +135,10 @@ router.post('/create', async (req, res) => {
     await fs.mkdir(dir, { recursive: true });
     
     await fs.writeFile(normalizedPath, content, 'utf-8');
-    res.json({ success: true, filePath: normalizedPath });
+    return res.json({ success: true, filePath: normalizedPath });
     } catch (error: any) {
     console.error('Create file error:', error);
-    res.status(500).json({ error: 'Failed to create file' });
+    return res.status(500).json({ error: 'Failed to create file' });
   }
 });
 
@@ -127,10 +154,10 @@ router.delete('/delete', async (req, res) => {
     const normalizedPath = validateFilePath(filePath);
     
     await fs.unlink(normalizedPath);
-    res.json({ success: true, filePath: normalizedPath });
+    return res.json({ success: true, filePath: normalizedPath });
   } catch (error: any) {
     console.error('Delete file error:', error);
-    res.status(404).json({ error: 'File not found' });
+    return res.status(404).json({ error: 'File not found' });
   }
 });
 
@@ -146,7 +173,7 @@ router.post('/search', async (req, res) => {
     const normalizedDir = validateFilePath(directory);
     
     const results = await searchFiles(normalizedDir, query, extensions);
-    res.json({ results });
+    return res.json({ results });
   } catch (error: any) {
     console.error('Search files error:', error);
     res.status(500).json({ error: 'Search failed' });

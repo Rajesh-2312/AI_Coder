@@ -41,7 +41,7 @@ router.post('/sessions', async (req, res) => {
 
     const session = await aiModelTrainer.createTrainingSession(value.name, value.description)
     
-    res.json({
+    return res.json({
       success: true,
       session
     })
@@ -75,7 +75,7 @@ router.post('/sessions/:sessionId/examples', async (req, res) => {
       value.agentTasks
     )
     
-    res.json({
+    return res.json({
       success: true,
       example
     })
@@ -103,7 +103,7 @@ router.put('/examples/:exampleId/success-rate', async (req, res) => {
 
     await aiModelTrainer.updateExampleSuccessRate(exampleId, value.successRate)
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Success rate updated'
     })
@@ -122,7 +122,7 @@ router.get('/examples', async (req, res) => {
     const { pattern } = req.query
     const examples = await aiModelTrainer.getTrainingExamples(pattern as string)
     
-    res.json({
+    return res.json({
       success: true,
       examples
     })
@@ -149,7 +149,7 @@ router.post('/generate-plan', async (req, res) => {
 
     const result = await aiModelTrainer.generateAgentPlan(userInput)
     
-    res.json({
+    return res.json({
       success: true,
       ...result
     })
@@ -167,7 +167,7 @@ router.get('/stats', async (req, res) => {
   try {
     const stats = await aiModelTrainer.getTrainingStats()
     
-    res.json({
+    return res.json({
       success: true,
       stats
     })
@@ -210,7 +210,7 @@ router.post('/train', async (req, res) => {
       await aiModelTrainer.updateExampleSuccessRate(example.id, successRate)
     }
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Model trained successfully',
       session,
@@ -239,7 +239,7 @@ router.post('/match', async (req, res) => {
 
     const example = await aiModelTrainer.getBestMatchingExample(userInput)
     
-    res.json({
+    return res.json({
       success: true,
       example
     })

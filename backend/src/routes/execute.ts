@@ -44,7 +44,7 @@ router.post('/run', async (req: Request, res: Response) => {
     }
 
     const result = await executeCode(code, language, timeout, workingDirectory)
-    res.json(result)
+    return res.json(result)
   } catch (error: any) {
     console.error('Code execution error:', error)
     res.status(500).json({
@@ -85,7 +85,7 @@ router.post('/ai-command', async (req: Request, res: Response) => {
     
     console.log(`✅ AI Command completed with exit code: ${result.exitCode}`)
     
-    res.json(result)
+    return res.json(result)
   } catch (error: any) {
     console.error('AI command execution error:', error)
     res.status(500).json({

@@ -168,9 +168,13 @@ export const OllamaConfigPanel: React.FC = () => {
       {/* Current Status */}
       <div className="mb-6 p-4 bg-muted rounded-lg">
         <h3 className="font-semibold mb-2">Current Status</h3>
-        <p><strong>Active Server:</strong> {config.ollama.activeServer}</p>
-        <p><strong>Server URL:</strong> {config.ollama.servers[config.ollama.activeServer].url}</p>
-        <p><strong>Active Model:</strong> {config.ollama.activeServer === 'external' ? config.ai.externalModel : config.ai.defaultModel}</p>
+        {config && (
+          <>
+            <p><strong>Active Server:</strong> {config.ollama.activeServer}</p>
+            <p><strong>Server URL:</strong> {config.ollama.servers[config.ollama.activeServer as keyof typeof config.ollama.servers]?.url}</p>
+            <p><strong>Active Model:</strong> {config.ollama.activeServer === 'external' ? config.ai.externalModel : config.ai.defaultModel}</p>
+          </>
+        )}
       </div>
 
       {/* External Server Configuration */}

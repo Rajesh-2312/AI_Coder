@@ -1,268 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import { Download, CheckCircle, AlertCircle, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react'
+import { modelDownloadService, DownloadProgress } from '../services/modelDownloadService'
 
 interface ModelDownloadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onComplete: () => void;
+  onDownloadComplete: () => void
 }
 
-interface DownloadProgress {
-  downloaded: number;
-  total: number;
-  percentage: number;
-  speed: number;
-  eta: number;
-}
-
-export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
-  isOpen,
-  onClose,
-  onComplete
-}) => {
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
-  const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed' | 'error'>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const [modelStatus, setModelStatus] = useState<any>(null);
+export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({ onDownloadComplete }) => {
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [progress, setProgress] = useState<DownloadProgress | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [modelInfo, setModelInfo] = useState<{ size: number; path: string } | null>(null)
 
   useEffect(() => {
-    if (isOpen) {
-      checkModelStatus();
-      setupWebSocketListeners();
-    }
-    
-    return () => {
-      // Cleanup WebSocket listeners
-    };
-  }, [isOpen]);
+    // Get model info
+    modelDownloadService.getModelInfo().then((info) => {
+      setModelInfo(info)
+    })
+  }, [])
 
-  const checkModelStatus = async () => {
+  const handleDownload = async () => {
+    setIsDownloading(true)
+    setError(null)
+
     try {
-      const response = await fetch('/api/model/status');
-      const data = await response.json();
-      
-      if (data.success) {
-        setModelStatus(data.model);
-        
-        if (data.model.exists && data.model.downloadProgress === 100) {
-          setDownloadStatus('completed');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to check model status:', error);
-      setError('Failed to check model status');
-    }
-  };
+      const success = await modelDownloadService.downloadModel((progressData) => {
+        setProgress(progressData)
+      })
 
-  const setupWebSocketListeners = () => {
-    // Listen for download progress events
-    const socket = (window as any).socket;
-    if (socket) {
-      socket.on('model:download:progress', (data: DownloadProgress) => {
-        setDownloadProgress(data);
-        setDownloadStatus('downloading');
-      });
-
-      socket.on('model:download:complete', () => {
-        setDownloadStatus('completed');
-        setDownloadProgress(null);
-        onComplete();
-      });
-
-      socket.on('model:download:error', (data: { error: string }) => {
-        setError(data.error);
-        setDownloadStatus('error');
-      });
-    }
-  };
-
-  const startDownload = async () => {
-    try {
-      setError(null);
-      setDownloadStatus('downloading');
-      
-      const response = await fetch('/api/model/download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to start download');
-      }
-      
-    } catch (error) {
-      console.error('Download failed:', error);
-      setError(error instanceof Error ? error.message : 'Download failed');
-      setDownloadStatus('error');
-    }
-  };
-
-  const setupLocalModel = async () => {
-    try {
-      const response = await fetch('/api/model/setup-local', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        onComplete();
+      if (success) {
+        onDownloadComplete()
       } else {
-        throw new Error(data.error || 'Failed to setup local model');
+        setError('Failed to download model. Please try again.')
       }
-      
-    } catch (error) {
-      console.error('Setup failed:', error);
-      setError(error instanceof Error ? error.message : 'Setup failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to download model')
+    } finally {
+      setIsDownloading(false)
     }
-  };
+  }
 
   const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
 
-  const formatSpeed = (bytesPerSecond: number): string => {
-    return formatBytes(bytesPerSecond) + '/s';
-  };
-
-  const formatETA = (seconds: number): string => {
-    if (seconds < 60) return `${Math.round(seconds)}s`;
-    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-    return `${Math.round(seconds / 3600)}h`;
-  };
-
-  if (!isOpen) return null;
+  const formatTime = (seconds: number): string => {
+    if (seconds < 60) return `${Math.round(seconds)}s`
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = Math.round(seconds % 60)
+    return `${minutes}m ${remainingSeconds}s`
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Download className="h-5 w-5" />
-            AI Model Setup
-          </h2>
+      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-800">Download AI Model</h2>
+          <p className="text-gray-600 mt-2">
+            Download the AI model to use AI-Coder features
+          </p>
+        </div>
+
+        {modelInfo && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-blue-800">Model Size:</span>
+              <span className="text-sm font-bold text-blue-900">{formatBytes(modelInfo.size)}</span>
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-sm font-medium text-blue-800">File:</span>
+              <span className="text-sm text-blue-700">{modelInfo.path}</span>
+            </div>
+          </div>
+        )}
+
+        {progress && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Progress</span>
+              <span className="text-sm font-bold text-gray-900">{Math.round(progress.percentage)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                style={{ width: `${progress.percentage}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between mt-2 text-xs text-gray-600">
+              <span>{formatBytes(progress.downloaded)} / {formatBytes(progress.total)}</span>
+              <span>Speed: {formatBytes(progress.speed)}/s</span>
+              {progress.timeRemaining > 0 && (
+                <span>Time remaining: {formatTime(progress.timeRemaining)}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {!isDownloading && !progress && (
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                The AI model (approximately 800MB) is required to use all AI-Coder features including:
+              </p>
+              <ul className="list-disc list-inside mt-2 text-sm text-yellow-800 ml-4">
+                <li>AI code generation</li>
+                <li>Project creation</li>
+                <li>Code analysis and suggestions</li>
+                <li>AI-powered chat assistance</li>
+              </ul>
+            </div>
+
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+            >
+              Start Download
+            </button>
+          </div>
+        )}
+
+        {isDownloading && progress && progress.percentage >= 100 && (
           <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
+            onClick={onDownloadComplete}
+            className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors"
           >
-            <X className="h-4 w-4" />
+            Continue to AI-Coder
           </button>
-        </div>
-
-        <div className="space-y-4">
-          {/* Model Status */}
-          {modelStatus && (
-            <div className="bg-muted p-3 rounded-lg">
-              <div className="text-sm">
-                <div><strong>Model:</strong> {modelStatus.name}</div>
-                <div><strong>Size:</strong> {modelStatus.sizeFormatted} / {modelStatus.expectedSizeFormatted}</div>
-                <div><strong>Status:</strong> {modelStatus.exists ? 'Downloaded' : 'Not Downloaded'}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Download Progress */}
-          {downloadProgress && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Downloading...</span>
-                <span>{downloadProgress.percentage.toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${downloadProgress.percentage}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{formatBytes(downloadProgress.downloaded)} / {formatBytes(downloadProgress.total)}</span>
-                <span>{formatSpeed(downloadProgress.speed)} • ETA: {formatETA(downloadProgress.eta)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Status Messages */}
-          {downloadStatus === 'downloading' && !downloadProgress && (
-            <div className="flex items-center gap-2 text-blue-500">
-              <Download className="h-4 w-4 animate-spin" />
-              <span>Starting download...</span>
-            </div>
-          )}
-
-          {downloadStatus === 'completed' && (
-            <div className="flex items-center gap-2 text-green-500">
-              <CheckCircle className="h-4 w-4" />
-              <span>Download completed!</span>
-            </div>
-          )}
-
-          {downloadStatus === 'error' && (
-            <div className="flex items-center gap-2 text-red-500">
-              <AlertCircle className="h-4 w-4" />
-              <span>Download failed: {error}</span>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
-            {downloadStatus === 'idle' && !modelStatus?.exists && (
-              <button
-                onClick={startDownload}
-                className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center justify-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Download Model (800MB)
-              </button>
-            )}
-
-            {downloadStatus === 'completed' && (
-              <button
-                onClick={setupLocalModel}
-                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Setup Local Model
-              </button>
-            )}
-
-            {downloadStatus === 'error' && (
-              <button
-                onClick={startDownload}
-                className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center justify-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Retry Download
-              </button>
-            )}
-
-            {modelStatus?.exists && downloadStatus === 'idle' && (
-              <button
-                onClick={setupLocalModel}
-                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Use Local Model
-              </button>
-            )}
-          </div>
-
-          <div className="text-xs text-muted-foreground text-center">
-            The 800MB AI model will be downloaded and stored locally for faster responses.
-          </div>
-        </div>
+        )}
       </div>
     </div>
-  );
-};
-
+  )
+}

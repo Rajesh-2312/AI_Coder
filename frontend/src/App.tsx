@@ -5,6 +5,11 @@ import TrainingPanel from './components/TrainingPanel'
 import { useAuth } from './context/AuthContext'
 import { AuthModal } from './components/Auth/AuthModal'
 import { UserProfileDropdown } from './components/UserProfileDropdown'
+import { ModelDownloadModal } from './components/ModelDownloadModal'
+import { modelDownloadService } from './services/modelDownloadService'
+import { FileExplorer } from './components/FileExplorer'
+import { aiProjectManager } from './services/aiProjectManager'
+import SimpleCodeEditor from './components/SimpleCodeEditor'
 
 function App() {
   const [activeFile, setActiveFile] = useState('App.tsx')
@@ -17,9 +22,9 @@ function hello() {
 
 export default hello;`)
   const [chatMessages, setChatMessages] = useState([
-    { id: 1, type: 'ai', content: "Hello! I'm your AI coding assistant. I can help you create complete projects like tic-tac-toe games, web applications, and more! Try asking me to 'Create a tic-tac-toe game' or 'Build a todo app'." },
-    { id: 2, type: 'user', content: "Can you help me create a tic-tac-toe game?" },
-    { id: 3, type: 'ai', content: "Absolutely! I can create a complete tic-tac-toe game with React components, styling, and game logic. Just ask me to 'Create a tic-tac-toe game' and I'll build all the necessary files for you!" }
+    { id: 1, type: 'ai', content: "Hello! I'm your AI coding assistant. I can help you create complete projects like web applications, tools, and more! Try asking me to 'Create a todo app' or 'Build a calculator'." },
+    { id: 2, type: 'user', content: "Can you help me create a project?" },
+    { id: 3, type: 'ai', content: "Absolutely! I can create complete projects with React components, styling, and functionality. Just tell me what you want to build and I'll create all the necessary files for you!" }
   ])
   const [newMessage, setNewMessage] = useState('')
   const [terminalOutput, setTerminalOutput] = useState([
@@ -36,6 +41,8 @@ export default hello;`)
   const [showTrainingPanel, setShowTrainingPanel] = useState(false)
   const [runningProjectUrl, setRunningProjectUrl] = useState<string | null>(null)
   const [runningProjectName, setRunningProjectName] = useState<string | null>(null)
+  const [showModelDownload, setShowModelDownload] = useState(false)
+  const [modelDownloaded, setModelDownloaded] = useState(false)
 
   // Refs for auto-scrolling
   const chatMessagesRef = useRef<HTMLDivElement>(null)
@@ -60,11 +67,11 @@ export default hello;`)
   }
 
   const addSystemMessage = (content: string) => {
-    addAIMessage(`🔧 ${content}`, 'system')
+    addAIMessage(`SYSTEM: ${content}`, 'system')
   }
 
   const addAgentMessage = (agentName: string, action: string, details?: string) => {
-    const message = `🤖 **${agentName}**: ${action}${details ? ` - ${details}` : ''}`
+    const message = `AGENT [${agentName}]: ${action}${details ? ` - ${details}` : ''}`
     addAIMessage(message, 'agent')
   }
 
@@ -82,8 +89,95 @@ export default hello;`)
     }
   }, [terminalOutput, currentCommand])
 
+  // Check if model is downloaded when component mounts
+  useEffect(() => {
+    const checkModel = async () => {
+      const exists = await modelDownloadService.checkModelExists()
+      if (exists) {
+        setModelDownloaded(true)
+        setShowModelDownload(false)
+      } else {
+        setShowModelDownload(true)
+      }
+    }
+    checkModel()
+  }, [])
+
+  // Listen for terminal output from AI agent
+  useEffect(() => {
+    const handleTerminalOutput = (event: CustomEvent) => {
+      const output = event.detail.output
+      if (output) {
+        setTerminalOutput(prev => [...prev, output])
+        
+        // Auto-detect and fix errors
+        if (output.includes('error') || output.includes('Error') || output.includes('failed')) {
+          autoFixErrors()
+        }
+      }
+    }
+
+    window.addEventListener('terminalOutput', handleTerminalOutput as EventListener)
+    return () => window.removeEventListener('terminalOutput', handleTerminalOutput as EventListener)
+  }, [])
+
+  const autoFixErrors = async () => {
+    // Wait a bit to collect all errors
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    const { aiErrorFixer } = await import('./services/aiErrorFixer')
+    
+    addSystemMessage(`AI Agent: Analyzing terminal output for errors...`)
+    addAIMessage(`Detecting errors and querying AI model for solutions...`)
+    
+    try {
+      // Get AI-powered fixes
+      const fixes = await aiErrorFixer.detectAndFix(terminalOutput)
+      
+      if (fixes.length > 0) {
+        addSystemMessage(`AI Agent: Found ${fixes.length} fix(es) - Executing...`)
+        
+        let fixedCount = 0
+        for (const fix of fixes) {
+          addAIMessage(`Applying fix: ${fix.description} (confidence: ${Math.round(fix.confidence * 100)}%)`)
+          
+          const result = await aiErrorFixer.executeFix(fix)
+          
+          if (result.success) {
+            fixedCount++
+            addSystemMessage(`Success: ${fix.description}`)
+          } else {
+            addSystemMessage(`Failed: ${fix.description} - ${result.output}`)
+          }
+          
+          // Dispatch to terminal
+          window.dispatchEvent(new CustomEvent('terminalOutput', {
+            detail: { output: result.success ? `✓ Fixed: ${fix.description}` : `✗ Failed: ${fix.description}` }
+          }))
+        }
+        
+        if (fixedCount > 0) {
+          addAIMessage(`✅ Successfully applied ${fixedCount} fix(es)! Retrying build...`)
+        } else {
+          addAIMessage(`❌ Unable to auto-fix errors. Please review terminal output.`)
+        }
+      } else {
+        addAIMessage(`No automatic fixes available. Review the errors above.`)
+      }
+    } catch (error) {
+      addSystemMessage(`Auto-fix error: ${error}`)
+      addAIMessage(`Failed to generate fixes. ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   const addTerminalOutput = (content: string) => {
     setTerminalOutput(prev => [...prev, content])
+  }
+
+  const handleClearChat = () => {
+    setChatMessages([
+      { id: 1, type: 'ai', content: "Hello! I'm your AI coding assistant. I can help you create complete projects like web applications, tools, and more! Try asking me to 'Create a todo app' or 'Build a calculator'." }
+    ])
   }
 
   const handleSendMessage = async () => {
@@ -148,18 +242,17 @@ export default hello;`)
             // Use the trained plan to execute the project
             await executeTrainedPlan(planResult.plan, message)
           } else {
-            // Fall back to hardcoded patterns
-            if (message.toLowerCase().includes('tic-tac-toe') || message.toLowerCase().includes('tictactoe')) {
-              await createTicTacToeGame()
-            } else {
-          // Generic project creation
-          addAgentMessage('Code Agent', 'Generating code', 'Using AI model to create project')
-          addSystemMessage('Analyzing requirements and generating code structure')
-          const response = await aiService.generateCode(message)
-          if (response.success) {
-            addAgentMessage('Code Agent', 'Code generation completed', 'Project structure ready')
-            addAIMessage(response.content)
-          } else {
+            // Try AI agent for any project
+            try {
+              const aiAgent = await import('./services/aiAgent')
+              await aiAgent.aiAgent.executeTask(message)
+            } catch (agentError) {
+              console.error('AI Agent error:', agentError)
+              // Fallback to generic AI response
+              const response = await aiService.generateCode(message)
+              if (response.success) {
+                addAIMessage(response.content)
+              } else {
                 addAIMessage(`❌ AI Error: ${response.error}`)
               }
             }
@@ -248,254 +341,27 @@ export default hello;`)
     }
   }
 
-  const createTicTacToeGame = async () => {
-    try {
-      // Agent activity: Initial analysis
-      addAgentMessage('Project Agent', 'Analyzing request for tic-tac-toe game')
-      addSystemMessage('Project Type: React Component Game')
-      addSystemMessage('Technologies: React, TypeScript, Tailwind CSS')
-      
-      addAIMessage('📁 Creating TicTacToe component...')
-      addAgentMessage('File Agent', 'Creating component file', 'src/components/TicTacToe.tsx')
-      
-      const ticTacToeCode = `import React, { useState } from 'react'
-
-interface TicTacToeProps {}
-
-const TicTacToe: React.FC<TicTacToeProps> = () => {
-  const [board, setBoard] = useState<string[]>(Array(9).fill(''))
-  const [isXNext, setIsXNext] = useState(true)
-  const [winner, setWinner] = useState<string | null>(null)
-
-  const calculateWinner = (squares: string[]): string | null => {
-    const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8],
-      [0, 3, 6], [1, 4, 7], [2, 5, 8],
-      [0, 4, 8], [2, 4, 6],
-    ]
-
-    for (let i = 0; i < lines.length; i++) {
-      const [a, b, c] = lines[i]
-      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-        return squares[a]
-      }
-    }
-    return null
-  }
-
-  const handleClick = (index: number) => {
-    if (board[index] || winner) return
-
-    const newBoard = [...board]
-    newBoard[index] = isXNext ? 'X' : 'O'
-    setBoard(newBoard)
-    setIsXNext(!isXNext)
-
-    const gameWinner = calculateWinner(newBoard)
-    if (gameWinner) {
-      setWinner(gameWinner)
-    }
-  }
-
-  const resetGame = () => {
-    setBoard(Array(9).fill(''))
-    setIsXNext(true)
-    setWinner(null)
-  }
-
-  return (
-    <div className="flex flex-col items-center space-y-4 p-8">
-      <h1 className="text-3xl font-bold text-blue-600">Tic Tac Toe</h1>
-      
-      <div className="grid grid-cols-3 gap-1">
-        {Array(9).fill(null).map((_, index) => (
-          <button
-            key={index}
-            className="w-16 h-16 border-2 border-gray-300 text-2xl font-bold hover:bg-gray-100 bg-white"
-            onClick={() => handleClick(index)}
-          >
-            {board[index]}
-          </button>
-        ))}
-      </div>
-      
-      <div className="text-center">
-        {winner ? (
-          <div>
-            <p className="text-xl font-semibold text-green-600 mb-2">
-              Winner: {winner}!
-            </p>
-            <button
-              onClick={resetGame}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Play Again
-            </button>
-          </div>
-        ) : (
-          <p className="text-lg text-gray-700">
-            Next player: {isXNext ? 'X' : 'O'}
-          </p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-export default TicTacToe`
-
-      // Dispatch agent file operation event - Creating
-      const filePath = 'src/components/TicTacToe.tsx'
-      window.dispatchEvent(new CustomEvent('agentFileOperation', {
-        detail: { agent: 'File Agent', action: 'creating', filePath, status: 'active' }
-      }))
-      
-      // Create the TicTacToe component file in the correct frontend directory
-      const success = await aiService.createFile(filePath, ticTacToeCode)
-      
-      // Dispatch completion event
-      window.dispatchEvent(new CustomEvent('agentFileOperation', {
-        detail: { agent: 'File Agent', action: 'creating', filePath, status: 'completed' }
-      }))
-      
-      if (success) {
-        addAgentMessage('File Agent', 'File created successfully', 'src/components/TicTacToe.tsx (250 lines of code)')
-        addAIMessage('✅ TicTacToe component created successfully!')
-        addTerminalOutput('📄 Created: src/components/TicTacToe.tsx')
-        
-        // Dispatch file creation event for real-time file explorer updates
-        window.dispatchEvent(new CustomEvent('fileCreated', {
-          detail: { filePath }
-        }))
-        
-        // Refresh file explorer to show new file
-        window.dispatchEvent(new CustomEvent('fileExplorerRefresh'))
-        
-        // Update App.tsx to use the new component
-        const appCode = `import React from 'react'
-import TicTacToe from './components/TicTacToe'
-import './App.css'
-
-function App() {
-  return (
-    <div className="App">
-      <TicTacToe />
-    </div>
-  )
-}
-
-export default App`
-        
-        addAgentMessage('File Agent', 'Updating App.tsx', 'Integrating TicTacToe component')
-        
-        const appPath = 'src/App.tsx'
-        // Dispatch agent file operation event - Updating
-        window.dispatchEvent(new CustomEvent('agentFileOperation', {
-          detail: { agent: 'File Agent', action: 'updating', filePath: appPath, status: 'active' }
-        }))
-        
-        await aiService.updateFile(appPath, appCode)
-        
-        // Dispatch completion event
-        window.dispatchEvent(new CustomEvent('agentFileOperation', {
-          detail: { agent: 'File Agent', action: 'updating', filePath: appPath, status: 'completed' }
-        }))
-        
-        addAgentMessage('File Agent', 'File updated successfully', 'src/App.tsx')
-        addAIMessage('✅ Updated App.tsx to use TicTacToe component!')
-        addTerminalOutput('📝 Updated: src/App.tsx')
-        
-        // Dispatch file update event for real-time file explorer updates
-        window.dispatchEvent(new CustomEvent('fileCreated', {
-          detail: { filePath: appPath }
-        }))
-        
-        // Refresh file explorer to show updated file
-        window.dispatchEvent(new CustomEvent('fileExplorerRefresh'))
-        
-        // Execute build command
-        addAgentMessage('Build Agent', 'Starting project build', 'TypeScript compilation')
-        addSystemMessage('Building frontend project with Vite')
-        addTerminalOutput('$ npm run build')
-        addAIMessage('🔨 Building project...')
-        
-        const buildResult = await aiService.executeCommand('npm run build', 'frontend', 30000, 'Build the frontend project')
-        
-        if (buildResult.success) {
-          addTerminalOutput('✓ Build completed successfully')
-          addAgentMessage('Build Agent', 'Build completed', 'Project ready for deployment')
-          addSystemMessage('🎉 All agents completed successfully')
-          addAIMessage('🎉 Tic-tac-toe game created and built successfully!')
-        } else {
-          // Show detailed build errors
-          addTerminalOutput(`❌ Build failed with errors:`)
-          addTerminalOutput(buildResult.stderr || buildResult.error || 'Unknown build error')
-          
-          // Parse and show specific errors
-          const errorLines = (buildResult.stderr || '').split('\n').filter(line => 
-            line.includes('error') || line.includes('Error') || line.includes('TS')
-          )
-          
-          if (errorLines.length > 0) {
-            addTerminalOutput('📋 Error Summary:')
-            errorLines.slice(0, 5).forEach(line => {
-              addTerminalOutput(`  ${line.trim()}`)
-            })
-            if (errorLines.length > 5) {
-              addTerminalOutput(`  ... and ${errorLines.length - 5} more errors`)
-            }
-          }
-          
-          addAIMessage('⚠️ Game created but build failed due to TypeScript errors.')
-          addAIMessage('🔍 Common issues: JSX syntax errors, missing imports, or file extensions')
-          addAIMessage('💡 Trying development mode instead (more forgiving)...')
-          
-          // Try test mode as fallback (runs on port 3002)
-          addTerminalOutput('$ npm run dev:test')
-          const devResult = await aiService.executeCommand('npm run dev:test', 'frontend', 15000, 'Start test server on port 3002')
-          
-          if (devResult.success) {
-            addTerminalOutput('✓ Frontend development server started successfully')
-            addAIMessage('🎉 Project created! Running in development mode.')
-            
-            // Set the running project URL on a different port for testing
-            const projectUrl = 'http://localhost:3002'
-            setRunningProjectUrl(projectUrl)
-            setRunningProjectName('TicTacToe Game')
-            addAIMessage(`🌐 Project running at: ${projectUrl}`)
-            addAIMessage('💡 Open this URL in a new tab to test your project!')
-          } else {
-            // Check for port conflict errors
-            const errorOutput = devResult.stderr || devResult.error || ''
-            if (errorOutput.includes('EADDRINUSE') || errorOutput.includes('address already in use')) {
-              addTerminalOutput('⚠️ Port conflict detected - development server already running')
-              addTerminalOutput('💡 The frontend development server is already running')
-              
-              // Set the running project URL on a different port for testing
-              const projectUrl = 'http://localhost:3002'
-              setRunningProjectUrl(projectUrl)
-              setRunningProjectName('TicTacToe Game')
-              
-              addAIMessage('🎉 Project created successfully!')
-              addAIMessage(`🌐 Project running at: ${projectUrl}`)
-              addAIMessage('💡 Open this URL in a new tab to test your project!')
-            } else {
-              addTerminalOutput(`❌ Frontend development server failed: ${errorOutput}`)
-              addAIMessage('❌ Both build and development mode failed. Check the terminal for details.')
-            }
-          }
-        }
-      } else {
-        addAIMessage('❌ Failed to create TicTacToe component')
-      }
-    } catch (error) {
-      addAIMessage(`❌ Error creating tic-tac-toe game: ${error}`)
-    }
-  }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSendMessage()
+    }
+  }
+
+  const handleFileSelect = async (file: any) => {
+    console.log('File selected:', file)
+    // Normalize path (convert backslashes to forward slashes)
+    const normalizedPath = file.path.replace(/\\/g, '/')
+    setActiveFile(normalizedPath)
+    try {
+      // Load file content from backend
+      const content = await aiService.getFileContent(normalizedPath)
+      console.log('File content loaded, length:', content.length)
+      console.log('First 200 chars:', content.substring(0, 200))
+      setCodeContent(content)
+    } catch (error) {
+      console.error('Failed to load file content:', error)
+      setCodeContent('// File not found or failed to load')
     }
   }
 
@@ -670,34 +536,46 @@ body {
     }
   }, [isDragging, dragStart])
 
+  // Show model download modal if model is not downloaded
+  if (showModelDownload && !modelDownloaded) {
+    return (
+      <ModelDownloadModal
+        onDownloadComplete={() => {
+          setShowModelDownload(false)
+          setModelDownloaded(true)
+        }}
+      />
+    )
+  }
+
   return (
-    <div className="h-screen flex flex-col bg-gray-100 text-gray-900" ref={containerRef}>
+    <div className="h-screen flex flex-col bg-[#1e1e1e] text-[#cccccc]" ref={containerRef}>
                     {/* Top Menu Bar */}
-      <div className="h-12 border-b border-gray-300 bg-white flex items-center px-4 shadow-sm">
-        <h1 className="text-lg font-semibold text-blue-600">AI-Coder</h1>
+      <div className="h-10 border-b border-[#3e3e42] bg-[#2d2d30] flex items-center px-4">
+        <h1 className="text-sm font-medium text-[#cccccc] tracking-wide">AI-CODER</h1>
         {isAIActive && (
-          <div className="ml-4 flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-sm text-gray-600">AI Agent Working...</span>
+          <div className="ml-4 flex items-center gap-2 text-xs text-[#858585]">
+            <span className="status-indicator status-active"></span>
+            <span>AI Agent Working...</span>
           </div>
         )}
         <div className="ml-auto flex gap-2">
           <button 
             onClick={() => setShowTrainingPanel(!showTrainingPanel)}
-            className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
+            className="btn btn-primary text-xs"
           >
             {showTrainingPanel ? 'Hide Training' : 'Training'}
           </button>
           <button 
             onClick={() => runCommand('npm run build')}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="btn btn-primary text-xs"
           >
             Build
           </button>
-          <button className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600">
+          <button className="btn text-xs">
             Settings
           </button>
-          <button className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600">
+          <button className="btn text-xs">
             Help
           </button>
           <UserProfileDropdown />
@@ -717,92 +595,50 @@ body {
         
         {/* Left: FileExplorer */}
         <div 
-          className="bg-white border-r border-gray-300 flex flex-col"
+          className="panel flex flex-col"
           style={{ width: `${panelSizes.fileExplorer}%` }}
         >
-          <div className="p-4 border-b border-gray-300">
-            <h2 className="text-sm font-semibold text-gray-700">📁 Explorer</h2>
-          </div>
-          <div className="p-2 flex-1 overflow-y-auto">
-            <div className="space-y-1">
-              <div 
-                className="flex items-center py-1 px-2 cursor-pointer hover:bg-gray-100 rounded"
-                onClick={() => handleFileClick('src')}
-              >
-                <span className="mr-2">📁</span>
-                <span className="text-sm">src</span>
-              </div>
-              <div className="pl-6 space-y-1">
-                <div 
-                  className="flex items-center py-1 px-2 cursor-pointer hover:bg-gray-100 rounded"
-                  onClick={() => handleFileClick('App.tsx')}
-                >
-                  <span className="mr-2">🔷</span>
-                  <span className="text-sm">App.tsx</span>
-                </div>
-                <div 
-                  className="flex items-center py-1 px-2 cursor-pointer hover:bg-gray-100 rounded"
-                  onClick={() => handleFileClick('index.css')}
-                >
-                  <span className="mr-2">🎨</span>
-                  <span className="text-sm">index.css</span>
-                </div>
-              </div>
-              <div 
-                className="flex items-center py-1 px-2 cursor-pointer hover:bg-gray-100 rounded"
-                onClick={() => handleFileClick('package.json')}
-              >
-                <span className="mr-2">📋</span>
-                <span className="text-sm">package.json</span>
-              </div>
-            </div>
-          </div>
-          {isAIActive && (
-            <div className="p-2 text-sm text-gray-600 border-t border-gray-300 bg-gray-50">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                AI creating files...
-              </div>
-            </div>
-          )}
+          <FileExplorer 
+            onFileSelect={handleFileSelect}
+            selectedFile={activeFile}
+          />
                       </div>
                       
         {/* Vertical Resizer */}
         <div
-          className="w-1 bg-gray-300 hover:bg-blue-400 cursor-ew-resize transition-colors"
+          className="w-1 resizer cursor-ew-resize"
           onMouseDown={(e) => handleMouseDown(e, 'horizontal-left')}
         />
 
         {/* Center: EditorPanel */}
         <div className="flex flex-col" style={{ width: `${panelSizes.editor}%` }}>
           <div className="flex-1 p-4" style={{ height: `${100 - terminalHeight}%` }}>
-            <div className="h-full border border-gray-300 rounded bg-white shadow-sm">
-              <div className="h-8 border-b border-gray-300 bg-gray-50 flex items-center px-4 rounded-t">
-                <span className="text-sm font-medium text-gray-700">{activeFile}</span>
+            <div className="h-full border border-[#3e3e42] rounded bg-[#1e1e1e]">
+              <div className="h-8 border-b border-[#3e3e42] bg-[#2d2d30] flex items-center px-4 rounded-t">
+                <span className="text-xs font-medium text-[#cccccc]">{activeFile}</span>
               </div>
-              <div className="h-full p-4">
-                <textarea
+              <div className="h-full">
+                <SimpleCodeEditor
                   value={codeContent}
-                  onChange={(e) => setCodeContent(e.target.value)}
-                  className="w-full h-full bg-white text-gray-900 font-mono text-sm resize-none border-none outline-none"
-                  placeholder="Start coding..."
+                  language="typescript"
+                  onChange={(value) => setCodeContent(value || '')}
                 />
-                        </div>
-                        </div>
+              </div>
+            </div>
                       </div>
                       
           {/* Horizontal Resizer */}
           <div
-            className="h-1 bg-gray-300 hover:bg-blue-400 cursor-ns-resize transition-colors"
+            className="h-1 resizer cursor-ns-resize"
             onMouseDown={(e) => handleMouseDown(e, 'vertical')}
           />
           
           {/* Bottom: TerminalView */}
-          <div className="bg-white p-4" style={{ height: `${terminalHeight}%` }}>
-            <h2 className="text-lg font-semibold mb-2 text-gray-700">Terminal</h2>
+          <div className="bg-[#1e1e1e] border-t border-[#3e3e42] p-4" style={{ height: `${terminalHeight}%` }}>
+            <h2 className="text-xs font-semibold mb-2 text-[#cccccc] uppercase tracking-wider">Terminal</h2>
             <div 
               ref={terminalRef}
-              className="h-full bg-black text-green-400 font-mono text-sm p-2 rounded overflow-y-auto cursor-text focus:outline-none"
+              className="h-full bg-[#1e1e1e] text-[#4ec9b0] font-mono text-xs p-2 rounded overflow-y-auto cursor-text focus:outline-none"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -857,64 +693,70 @@ body {
                     
         {/* Vertical Resizer */}
         <div
-          className="w-1 bg-gray-300 hover:bg-blue-400 cursor-ew-resize transition-colors"
+          className="w-1 resizer cursor-ew-resize"
           onMouseDown={(e) => handleMouseDown(e, 'horizontal-right')}
         />
 
         {/* Right: ChatPanel */}
         <div 
-          className="border-l border-gray-300 bg-white p-4 flex flex-col"
+          className="border-l border-[#3e3e42] panel p-4 flex flex-col"
           style={{ width: `${panelSizes.chat}%` }}
         >
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold text-gray-700">AI Chat</h2>
-            {runningProjectUrl && (
-              <div className="flex items-center gap-2 text-xs text-gray-600 bg-green-50 px-2 py-1 rounded border border-green-200">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="font-medium">{runningProjectName || 'Project'}</span>
-              </div>
-            )}
+            <h2 className="text-xs font-semibold text-[#cccccc] uppercase tracking-wider">AI Chat</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClearChat}
+                className="text-xs px-2 py-1 text-[#858585] hover:text-[#cccccc] hover:bg-[rgba(255,255,255,0.08)] rounded transition-colors"
+                title="Clear Chat"
+              >
+                Clear
+              </button>
+              {runningProjectUrl && (
+                <div className="flex items-center gap-2 text-xs text-[#4ec9b0] bg-[#264f49] px-2 py-1 rounded border border-[#4ec9b0]">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="font-medium">{runningProjectName || 'Project'}</span>
+                </div>
+              )}
+            </div>
           </div>
           {runningProjectUrl && (
-            <div className="mb-2 text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
-              <span className="font-medium">🌐 Running at: </span>
+            <div className="mb-2 text-xs text-[#569cd6] bg-[#1a3a5c] px-2 py-1 rounded border border-[#007acc]">
+              <span className="font-medium">Running at: </span>
               <a 
                 href={runningProjectUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-[#007acc] hover:underline"
               >
                 {runningProjectUrl}
               </a>
             </div>
           )}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col h-full">
             <div 
               ref={chatMessagesRef}
-              className="flex-1 bg-gray-50 rounded p-3 mb-3 overflow-y-auto max-h-96 min-h-0 scroll-smooth"
+              className="flex-1 bg-[#252526] rounded p-3 mb-3 overflow-y-auto scroll-smooth"
               style={{ scrollBehavior: 'smooth' }}
             >
               <div className="space-y-2">
                 {chatMessages.map((message) => {
-                  let bgColor = ''
-                  let borderColor = ''
+                  let messageClass = ''
                   
                   if (message.type === 'ai') {
-                    bgColor = 'bg-blue-500 text-white'
+                    messageClass = 'message message-ai'
                   } else if (message.type === 'system') {
-                    bgColor = 'bg-purple-500 text-white'
-                    borderColor = 'border-l-4 border-purple-300'
+                    messageClass = 'message message-system'
                   } else if (message.type === 'agent') {
-                    bgColor = 'bg-green-600 text-white'
-                    borderColor = 'border-l-4 border-green-300'
+                    messageClass = 'message message-agent'
                   } else {
-                    bgColor = 'bg-gray-200 text-gray-800'
+                    messageClass = 'message message-user'
                   }
                   
                   return (
                     <div 
                       key={message.id}
-                      className={`p-2 rounded text-sm ${bgColor} ${borderColor}`}
+                      className={messageClass}
                     >
                       {message.content}
                     </div>
@@ -922,7 +764,7 @@ body {
                 })}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="mt-auto flex gap-2">
               <input 
                 type="text" 
                 placeholder={isAIActive ? "AI Agent is working..." : "Ask AI to create projects..."} 
@@ -930,14 +772,14 @@ body {
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 disabled={isAIActive}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded bg-white text-gray-900 disabled:opacity-50"
+                className="flex-1 px-3 py-2 text-xs border border-[#3e3e42] rounded bg-[#252526] text-[#cccccc] disabled:opacity-50"
               />
               <button 
                 onClick={handleSendMessage}
                 disabled={isAIActive || !newMessage.trim()}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                className="btn btn-primary disabled:opacity-50"
               >
-                {isAIActive ? "AI Working..." : "Send"}
+                {isAIActive ? "Working..." : "Send"}
               </button>
             </div>
           </div>
@@ -952,6 +794,9 @@ const AppWithAuth = () => {
   const { user, loading } = useAuth()
   const [showAuth, setShowAuth] = useState(!user && !loading)
 
+  // Note: This useEffect is commented out as it references variables from App
+  // which are not accessible in AppWithAuth wrapper
+
   useEffect(() => {
     if (user) {
       setShowAuth(false)
@@ -962,8 +807,8 @@ const AppWithAuth = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading...</div>
+      <div className="flex items-center justify-center h-screen bg-[#1e1e1e]">
+        <div className="text-lg text-[#cccccc]">Loading...</div>
       </div>
     )
   }

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useReducer, useMemo, useCallback, useEffect, useRef } from 'react'
-import { performance } from 'perf_hooks'
 
 interface PerformanceMetrics {
   renderCount: number

@@ -33,7 +33,7 @@ router.get('/status', async (req, res) => {
       sizeFormatted = formatBytes(size);
     }
     
-    res.json({
+    return res.json({
       success: true,
       model: {
         name: MODEL_CONFIG.name,
@@ -112,7 +112,7 @@ router.post('/download', async (req, res) => {
       });
     });
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Model download started',
       modelName: MODEL_CONFIG.name
@@ -159,7 +159,7 @@ router.post('/setup-local', async (req, res) => {
     
     console.log('Local model setup completed');
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Local model setup completed',
       modelName: MODEL_CONFIG.name,

@@ -223,21 +223,21 @@ export const PerformanceDashboard = memo<PerformanceDashboardProps>(({
   }, [fetchMetrics])
 
   // Calculate trends
-  const trends = useMemo(() => {
+  const trends = useMemo((): { cpu?: 'up' | 'down' | 'stable'; memory?: 'up' | 'down' | 'stable'; network?: 'up' | 'down' | 'stable'; cache?: 'up' | 'down' | 'stable' } => {
     if (historicalData.length < 2) return {}
 
     const current = historicalData[historicalData.length - 1]
     const previous = historicalData[historicalData.length - 2]
 
     return {
-      cpu: current.cpu.usage > previous.cpu.usage ? 'up' : 
-           current.cpu.usage < previous.cpu.usage ? 'down' : 'stable',
-      memory: current.memory.percentage > previous.memory.percentage ? 'up' : 
-              current.memory.percentage < previous.memory.percentage ? 'down' : 'stable',
-      network: current.network.requestsPerSecond > previous.network.requestsPerSecond ? 'up' : 
-               current.network.requestsPerSecond < previous.network.requestsPerSecond ? 'down' : 'stable',
-      cache: current.cache.hitRate > previous.cache.hitRate ? 'up' : 
-             current.cache.hitRate < previous.cache.hitRate ? 'down' : 'stable'
+      cpu: (current.cpu.usage > previous.cpu.usage ? 'up' : 
+           current.cpu.usage < previous.cpu.usage ? 'down' : 'stable') as 'up' | 'down' | 'stable',
+      memory: (current.memory.percentage > previous.memory.percentage ? 'up' : 
+              current.memory.percentage < previous.memory.percentage ? 'down' : 'stable') as 'up' | 'down' | 'stable',
+      network: (current.network.requestsPerSecond > previous.network.requestsPerSecond ? 'up' : 
+               current.network.requestsPerSecond < previous.network.requestsPerSecond ? 'down' : 'stable') as 'up' | 'down' | 'stable',
+      cache: (current.cache.hitRate > previous.cache.hitRate ? 'up' : 
+             current.cache.hitRate < previous.cache.hitRate ? 'down' : 'stable') as 'up' | 'down' | 'stable'
     }
   }, [historicalData])
 

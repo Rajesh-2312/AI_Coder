@@ -282,7 +282,7 @@ router.get('/',
     try {
       const config = await configService.loadConfig()
       
-      res.json({
+      return res.json({
         config,
         timestamp: new Date().toISOString()
       })
@@ -299,7 +299,7 @@ router.get('/load',
     try {
       const config = await configService.loadConfig()
       
-      res.json({
+      return res.json({
         success: true,
         settings: config,
         timestamp: new Date().toISOString()
@@ -326,7 +326,7 @@ router.post('/',
 
       const updatedConfig = await configService.updateConfig(updates)
       
-      res.json({
+      return res.json({
         message: 'Configuration updated successfully',
         config: updatedConfig,
         timestamp: new Date().toISOString()
@@ -346,7 +346,7 @@ router.post('/reset',
       const { section } = req.body
       const config = await configService.resetConfig(section)
       
-      res.json({
+      return res.json({
         message: section ? `Configuration section '${section}' reset successfully` : 'Configuration reset successfully',
         config,
         timestamp: new Date().toISOString()
@@ -386,7 +386,7 @@ router.post('/import',
 
       const config = await configService.importConfig(configData)
       
-      res.json({
+      return res.json({
         message: 'Configuration imported successfully',
         config,
         timestamp: new Date().toISOString()
@@ -405,7 +405,7 @@ router.get('/validate',
       const config = await configService.loadConfig()
       const validation = await configService.validateConfig(config)
       
-      res.json({
+      return res.json({
         ...validation,
         timestamp: new Date().toISOString()
       })
@@ -422,7 +422,7 @@ router.get('/backup',
     try {
       const backupFile = await configService.backupConfig()
       
-      res.json({
+      return res.json({
         message: 'Configuration backup created successfully',
         backupFile,
         timestamp: new Date().toISOString()
@@ -440,7 +440,7 @@ router.get('/backups',
     try {
       const backups = await configService.listBackups()
       
-      res.json({
+      return res.json({
         backups,
         count: backups.length,
         timestamp: new Date().toISOString()
@@ -458,7 +458,7 @@ router.get('/path',
     try {
       const configPath = await configService.getConfigPath()
       
-      res.json({
+      return res.json({
         path: configPath,
         timestamp: new Date().toISOString()
       })

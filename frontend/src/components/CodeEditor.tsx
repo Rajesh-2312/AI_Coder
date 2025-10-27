@@ -175,7 +175,6 @@ export const CodeEditor = memo<CodeEditorProps>(({
 }) => {
   const { activeFile, getFileById, updateFile } = useFileOperations()
   const [content, setContent] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const editorRef = useRef<any>(null)
   const monacoRef = useRef<any>(null)

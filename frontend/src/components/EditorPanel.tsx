@@ -5,18 +5,14 @@ import { useTheme } from '../context/ThemeContext'
 import { X, FileText } from 'lucide-react'
 
 export const EditorPanel: React.FC = () => {
-  const { 
-    currentFile, 
-    openFiles, 
-    activeTab, 
-    setActiveTab, 
-    closeFile, 
-    fileContents, 
-    updateFileContent 
-  } = useApp()
+  const { state } = useApp()
   const { isDark } = useTheme()
   
   const [editorValue, setEditorValue] = useState('')
+  
+  // Get active file from state
+  const activeFile = state.activeFile
+  const files = state.files
 
   // Get file extension for language detection
   const getLanguage = (filename: string) => {
@@ -41,13 +37,14 @@ export const EditorPanel: React.FC = () => {
     return languageMap[ext || ''] || 'plaintext'
   }
 
-  // Update editor value when active tab changes
+  // Update editor value when active file changes
   useEffect(() => {
-    if (activeTab) {
-      const content = fileContents[activeTab] || getDefaultContent(activeTab)
+    if (activeFile) {
+      const file = files.find(f => f.id === activeFile)
+      const content = file?.content || getDefaultContent(file?.name || '')
       setEditorValue(content)
     }
-  }, [activeTab, fileContents])
+  }, [activeFile, files])
 
   const getDefaultContent = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase()
@@ -133,38 +130,40 @@ body {
   }
 
   const handleEditorChange = (value: string | undefined) => {
-    if (value !== undefined && activeTab) {
+    if (value !== undefined && activeFile) {
       setEditorValue(value)
-      updateFileContent(activeTab, value)
+      // TODO: Update file content when feature is implemented
     }
   }
 
-  const handleTabClick = (filename: string) => {
-    setActiveTab(filename)
+  const handleTabClick = (fileId: string) => {
+    // TODO: Set active tab when feature is implemented
+    console.log('Clicked file:', fileId)
   }
 
-  const handleCloseTab = (filename: string, e: React.MouseEvent) => {
+  const handleCloseTab = (fileId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    closeFile(filename)
+    // TODO: Close file when feature is implemented
+    console.log('Close file:', fileId)
   }
 
   return (
     <div className="flex-1 flex flex-col bg-background">
       {/* Tab Bar */}
-      {openFiles.length > 0 && (
+      {files.length > 0 && (
         <div className="h-10 bg-muted border-b border-border flex items-center overflow-x-auto">
-          {openFiles.map((filename) => (
+          {files.filter(f => f.type === 'file').map((file) => (
             <div
-              key={filename}
-              onClick={() => handleTabClick(filename)}
+              key={file.id}
+              onClick={() => handleTabClick(file.id)}
               className={`flex items-center space-x-2 px-3 py-2 cursor-pointer border-r border-border hover:bg-accent transition-colors ${
-                activeTab === filename ? 'bg-background text-foreground' : 'text-muted-foreground'
+                activeFile === file.id ? 'bg-background text-foreground' : 'text-muted-foreground'
               }`}
             >
               <FileText className="h-4 w-4" />
-              <span className="text-sm whitespace-nowrap">{filename}</span>
+              <span className="text-sm whitespace-nowrap">{file.name}</span>
               <button
-                onClick={(e) => handleCloseTab(filename, e)}
+                onClick={(e) => handleCloseTab(file.id, e)}
                 className="hover:bg-destructive hover:text-destructive-foreground rounded-sm p-1 transition-colors"
               >
                 <X className="h-3 w-3" />
@@ -176,10 +175,10 @@ body {
 
       {/* Editor */}
       <div className="flex-1">
-        {activeTab ? (
+        {activeFile ? (
           <Editor
             height="100%"
-            language={getLanguage(activeTab)}
+            language={getLanguage(files.find(f => f.id === activeFile)?.name || '')}
             value={editorValue}
             onChange={handleEditorChange}
             theme={isDark ? 'vs-dark' : 'vs-light'}

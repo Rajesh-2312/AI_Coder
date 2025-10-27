@@ -22,8 +22,8 @@ interface FileExplorerProps {
 
 export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, selectedFile }) => {
   const [files, setFiles] = useState<FileItem[]>([])
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'src/components']))
-  const [loading, setLoading] = useState(true)
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(false)
   const [isAICreating, setIsAICreating] = useState(false)
   const [newlyCreatedFiles, setNewlyCreatedFiles] = useState<Set<string>>(new Set())
   const [agentActivity, setAgentActivity] = useState<AgentActivity[]>([])
@@ -32,45 +32,19 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
   const loadFiles = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Loading files from backend...')
-      // Load files from src directory (where AI agent creates files)
-      const response = await aiService.listFiles('src')
+      console.log('Loading files from backend...')
+      // Load files from frontend/src directory (where AI agent creates files)
+      const response = await aiService.listFiles('frontend/src')
       if (response.success) {
-        console.log('✅ Files loaded successfully:', response.files?.length || 0, 'items')
+        console.log('Files loaded successfully:', response.files?.length || 0, 'items')
         setFiles(response.files || [])
       } else {
-        console.error('❌ Failed to load files:', response.error)
-        // Fallback to static files if API fails
-        setFiles([
-          { name: 'src', type: 'folder', path: 'src', children: [
-            { name: 'components', type: 'folder', path: 'src/components', children: [] },
-            { name: 'App.tsx', type: 'file', path: 'src/App.tsx' },
-            { name: 'main.tsx', type: 'file', path: 'src/main.tsx' },
-            { name: 'index.css', type: 'file', path: 'src/index.css' }
-          ]},
-          { name: 'public', type: 'folder', path: 'public', children: [
-            { name: 'index.html', type: 'file', path: 'public/index.html' }
-          ]},
-          { name: 'package.json', type: 'file', path: 'package.json' },
-          { name: 'vite.config.ts', type: 'file', path: 'vite.config.ts' }
-        ])
+        console.error('Failed to load files:', response.error)
+        setFiles([])
       }
       } catch (error) {
-      console.error('❌ Error loading files:', error)
-      // Fallback to static files on error
-      setFiles([
-        { name: 'src', type: 'folder', path: 'src', children: [
-          { name: 'components', type: 'folder', path: 'src/components', children: [] },
-          { name: 'App.tsx', type: 'file', path: 'src/App.tsx' },
-          { name: 'main.tsx', type: 'file', path: 'src/main.tsx' },
-          { name: 'index.css', type: 'file', path: 'src/index.css' }
-        ]},
-        { name: 'public', type: 'folder', path: 'public', children: [
-          { name: 'index.html', type: 'file', path: 'public/index.html' }
-        ]},
-        { name: 'package.json', type: 'file', path: 'package.json' },
-        { name: 'vite.config.ts', type: 'file', path: 'vite.config.ts' }
-      ])
+      console.error('Error loading files:', error)
+      setFiles([])
     } finally {
       setLoading(false)
     }
@@ -83,14 +57,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
     // Set up periodic refresh every 30 seconds to catch any external changes
     const refreshInterval = setInterval(() => {
       if (!isAICreating) {
-        console.log('🔄 Periodic file explorer refresh')
+        console.log('Periodic file explorer refresh')
         loadFiles()
       }
     }, 30000)
 
     // Listen for file explorer refresh events
     const handleRefresh = () => {
-      console.log('🔄 File explorer refresh triggered')
+      console.log('File explorer refresh triggered')
       loadFiles()
     }
 
@@ -100,7 +74,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
     const handleAITaskUpdate = (event: CustomEvent) => {
       const task = event.detail
       if (task.status === 'completed' || task.status === 'failed') {
-        console.log('🤖 AI task completed, refreshing file explorer')
+        console.log('AI task completed, refreshing file explorer')
         setIsAICreating(false)
         setTimeout(loadFiles, 1000) // Small delay to ensure files are written
       } else if (task.status === 'executing') {
@@ -113,7 +87,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
       const { agent, action, filePath, status } = event.detail
       if (!agent || !action || !filePath) return
       
-      console.log(`🤖 Agent ${agent} ${action} file: ${filePath}`)
+      console.log(`Agent ${agent} ${action} file: ${filePath}`)
       
       setAgentActivity(prev => {
         const updated = prev.filter(activity => 
@@ -144,7 +118,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
       const filePath = event.detail?.filePath
       if (!filePath) return
       
-      console.log('📄 File created:', filePath)
+      console.log('File created:', filePath)
       setNewlyCreatedFiles(prev => new Set([...prev, filePath]))
       
       // Auto-expand parent folders
@@ -195,27 +169,27 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
 
   const getFileIcon = (file: FileItem) => {
     if (file.type === 'folder') {
-      return expandedFolders.has(file.path) ? '📂' : '📁'
+      return expandedFolders.has(file.path) ? '▼' : '▶'
     }
     
     const extension = file.name.split('.').pop()?.toLowerCase()
     switch (extension) {
       case 'tsx':
       case 'ts':
-        return '🔷'
+        return '◉'
       case 'jsx':
       case 'js':
-        return '🟨'
+        return '◈'
       case 'css':
-        return '🎨'
+        return '■'
       case 'html':
-        return '🌐'
+        return '△'
       case 'json':
-        return '📋'
+        return '◆'
       case 'md':
-        return '📝'
+        return '○'
       default:
-        return '📄'
+        return '□'
     }
   }
 
@@ -233,12 +207,12 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
     return (
       <div key={file.path}>
         <div
-          className={`flex items-center py-1 px-2 cursor-pointer hover:bg-accent/50 transition-all duration-300 ${
-            isSelected ? 'bg-accent border-r-2 border-primary' : ''
+          className={`file-item ${
+            isSelected ? 'selected' : ''
           } ${
-            isNewlyCreated ? 'bg-green-100 border-l-2 border-green-500 animate-pulse' : ''
+            isNewlyCreated ? 'bg-[rgba(78,201,176,0.1)] border-l border-[#4ec9b0]' : ''
           } ${
-            agentWorking ? 'bg-yellow-100 border-l-2 border-yellow-500 animate-pulse' : ''
+            agentWorking ? 'bg-[rgba(220,220,170,0.1)] border-l border-[#dcdcaa]' : ''
           }`}
           style={indentStyle}
           onClick={() => {
@@ -249,27 +223,27 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
             }
           }}
         >
-          <span className="mr-2 text-sm flex-shrink-0">
+          <span className="file-item-icon">
             {getFileIcon(file)}
           </span>
-          <span className={`text-sm text-foreground truncate flex-1 select-none ${
-            isNewlyCreated ? 'font-semibold text-green-700' : ''
+          <span className={`text-sm text-[#cccccc] truncate flex-1 select-none ${
+            isNewlyCreated ? 'font-semibold text-[#4ec9b0]' : ''
           } ${
-            agentWorking ? 'font-semibold text-yellow-700' : ''
+            agentWorking ? 'font-semibold text-[#dcdcaa]' : ''
           }`}>
             {file.name}
-            {isNewlyCreated && <span className="ml-1 text-xs text-green-600">✨</span>}
+            {isNewlyCreated && <span className="ml-1 text-xs status-indicator status-success"></span>}
             {agentWorking && (
-              <span className="ml-1 text-xs text-yellow-600 animate-pulse">
-                {agentAction === 'creating' && '⚡ Creating...'}
-                {agentAction === 'updating' && '📝 Updating...'}
-                {agentAction === 'deleting' && '🗑️ Deleting...'}
-                {agentAction === 'reading' && '👁️ Reading...'}
+              <span className="ml-1 text-xs animate-pulse">
+                {agentAction === 'creating' && '[Creating]'}
+                {agentAction === 'updating' && '[Updating]'}
+                {agentAction === 'deleting' && '[Deleting]'}
+                {agentAction === 'reading' && '[Reading]'}
               </span>
             )}
           </span>
           {file.type === 'folder' && (
-            <span className="text-xs text-muted-foreground ml-1 flex-shrink-0">
+            <span className="text-xs text-[#858585] ml-1 flex-shrink-0">
               {isExpanded ? '▼' : '▶'}
             </span>
           )}
@@ -292,40 +266,39 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
   }
 
   return (
-    <div className="h-full flex flex-col bg-card border-r border-border">
+    <div className="h-full flex flex-col bg-[#252526] border-r border-[#3e3e42]">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/20">
-        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <span className="text-xs">📁</span>
+      <div className="flex items-center justify-between px-3 py-2 panel-header">
+        <h2 className="text-xs font-semibold text-[#858585] flex items-center gap-2 uppercase tracking-wider">
           Explorer
           {isAICreating && (
-            <span className="text-xs text-green-600 flex items-center gap-1">
-              <span className="animate-spin">🤖</span>
-              AI Creating...
+            <span className="text-xs text-[#4ec9b0] flex items-center gap-1">
+              <span className="status-indicator status-active"></span>
+              AI Creating
             </span>
           )}
           {agentActivity.length > 0 && agentActivity.some(a => a.status === 'active') && (
-            <span className="text-xs text-yellow-600 flex items-center gap-1 animate-pulse">
-              <span className="animate-spin">⚡</span>
-              Agent Working...
+            <span className="text-xs text-[#dcdcaa] flex items-center gap-1">
+              <span className="status-indicator status-active"></span>
+              Agent Working
             </span>
           )}
         </h2>
         <div className="flex items-center gap-1">
             <button 
-            className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 hover:bg-[rgba(255,255,255,0.08)] rounded text-[#858585] hover:text-[#cccccc] transition-colors"
             title="Refresh Files"
             onClick={loadFiles}
             disabled={loading}
           >
-            <span className={`text-xs ${loading ? 'animate-spin' : ''}`}>🔄</span>
+            <span className={`text-xs ${loading ? 'animate-spin' : ''}`}>⟳</span>
             </button>
             <button 
-            className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 hover:bg-[rgba(255,255,255,0.08)] rounded text-[#858585] hover:text-[#cccccc] transition-colors"
             title="Collapse All"
             onClick={() => setExpandedFolders(new Set())}
           >
-            <span className="text-xs">📁</span>
+            <span className="text-xs">−</span>
             </button>
         </div>
       </div>
@@ -334,10 +307,22 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, select
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span className="animate-spin text-sm">🔄</span>
+            <div className="flex items-center gap-2 text-[#858585]">
+              <span className="animate-spin text-sm">⟳</span>
               <span className="text-sm">Loading files...</span>
             </div>
+          </div>
+        ) : files.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="text-4xl mb-4 text-[#858585]">📁</div>
+            <p className="text-sm text-[#858585] mb-2">No files yet</p>
+            <p className="text-xs text-[#858585]/70 max-w-xs">
+              {agentActivity.length > 0 ? (
+                agentActivity.some(a => a.status === 'active') ? (
+                  'AI Agent is creating files...'
+                ) : 'Files will appear here when AI creates them'
+              ) : 'Ask AI to create a project to see files here'}
+            </p>
           </div>
         ) : (
           <div className="space-y-1">

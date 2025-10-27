@@ -1,4 +1,5 @@
 import { aiService } from './aiService'
+import { errorDetector, type DetectedError } from './errorDetector'
 
 export interface FileOperation {
   type: 'create' | 'update' | 'delete' | 'read'
@@ -89,20 +90,23 @@ class AIAgent {
 
   private async createProjectPlan(taskDescription: string): Promise<ProjectPlan> {
     try {
-      const response = await aiService.executeProject(taskDescription)
+      const response = await fetch('http://localhost:3000/api/ai/execute-project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ description: taskDescription })
+      })
       
-      if (response.success && response.content) {
-        // Try to parse JSON response
-        try {
-          const plan = JSON.parse(response.content)
-          if (plan.files && Array.isArray(plan.files)) {
-            return plan
-          }
-        } catch (parseError) {
-          console.log('Failed to parse AI response as JSON, using fallback plan')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.plan) {
+          console.log('✅ Got project plan from backend:', data.plan)
+          return data.plan
         }
       }
       
+      console.log('Failed to get project plan, using fallback')
       // Fallback plan for common requests
       return this.createFallbackPlan(taskDescription)
     } catch (error) {
@@ -112,213 +116,6 @@ class AIAgent {
   }
 
   private createFallbackPlan(taskDescription: string): ProjectPlan {
-    const lowerDescription = taskDescription.toLowerCase()
-    
-    if (lowerDescription.includes('tic-tac-toe') || lowerDescription.includes('tictactoe')) {
-      return {
-        projectType: 'React Game',
-        technologies: ['React', 'TypeScript', 'CSS'],
-        files: [
-          {
-            type: 'create',
-            path: 'src/components/TicTacToe.tsx',
-            content: `import React, { useState } from 'react'
-
-interface TicTacToeProps {}
-
-const TicTacToe: React.FC<TicTacToeProps> = () => {
-  const [board, setBoard] = useState<string[]>(Array(9).fill(''))
-  const [isXNext, setIsXNext] = useState(true)
-  const [winner, setWinner] = useState<string | null>(null)
-
-  const calculateWinner = (squares: string[]): string | null => {
-    const lines = [
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6],
-    ]
-
-    for (let i = 0; i < lines.length; i++) {
-      const [a, b, c] = lines[i]
-      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-        return squares[a]
-      }
-    }
-    return null
-  }
-
-  const handleClick = (index: number) => {
-    if (board[index] || winner) return
-
-    const newBoard = [...board]
-    newBoard[index] = isXNext ? 'X' : 'O'
-    setBoard(newBoard)
-    setIsXNext(!isXNext)
-
-    const gameWinner = calculateWinner(newBoard)
-    if (gameWinner) {
-      setWinner(gameWinner)
-    }
-  }
-
-  const resetGame = () => {
-    setBoard(Array(9).fill(''))
-    setIsXNext(true)
-    setWinner(null)
-  }
-
-  const renderSquare = (index: number) => (
-    <button
-      key={index}
-      className="w-16 h-16 border border-gray-300 text-2xl font-bold hover:bg-gray-100"
-      onClick={() => handleClick(index)}
-    >
-      {board[index]}
-    </button>
-  )
-
-  return (
-    <div className="flex flex-col items-center space-y-4">
-      <h1 className="text-3xl font-bold">Tic Tac Toe</h1>
-      
-      <div className="grid grid-cols-3 gap-1">
-        {Array(9).fill(null).map((_, index) => renderSquare(index))}
-      </div>
-      
-      <div className="text-center">
-        {winner ? (
-          <div>
-            <p className="text-xl font-semibold text-green-600">
-              Winner: {winner}!
-            </p>
-            <button
-              onClick={resetGame}
-              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Play Again
-            </button>
-          </div>
-        ) : (
-          <p className="text-lg">
-            Next player: {isXNext ? 'X' : 'O'}
-          </p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-export default TicTacToe`,
-            reason: 'Create main game component'
-          },
-          {
-            type: 'create',
-            path: 'src/components/TicTacToe.css',
-            content: `.tic-tac-toe {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.game-board {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-}
-
-.square {
-  width: 64px;
-  height: 64px;
-  border: 2px solid #d1d5db;
-  font-size: 1.5rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.square:hover {
-  background-color: #f3f4f6;
-}
-
-.square:disabled {
-  cursor: not-allowed;
-}
-
-.game-info {
-  text-align: center;
-}
-
-.winner {
-  color: #059669;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.reset-button {
-  margin-top: 0.5rem;
-  padding: 0.5rem 1rem;
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.reset-button:hover {
-  background-color: #2563eb;
-}`,
-            reason: 'Add game styling'
-          },
-          {
-            type: 'update',
-            path: 'src/App.tsx',
-            content: `import React from 'react'
-import TicTacToe from './components/TicTacToe'
-import './App.css'
-
-function App() {
-  return (
-    <div className="App">
-      <TicTacToe />
-    </div>
-  )
-}
-
-export default App`,
-            reason: 'Update App to use TicTacToe component'
-          }
-        ],
-        dependencies: ['react', 'typescript'],
-        instructions: [
-          'Create a complete tic-tac-toe game',
-          'Implement game logic with win detection',
-          'Add interactive UI with hover effects',
-          'Include reset functionality'
-        ],
-        commands: [
-          {
-            command: 'npm install',
-            workingDirectory: 'frontend',
-            timeout: 30000,
-            description: 'Install frontend dependencies'
-          },
-          {
-            command: 'npm run build',
-            workingDirectory: 'frontend',
-            timeout: 60000,
-            description: 'Build the frontend project'
-          }
-        ]
-      }
-    }
-
     // Generic fallback
     return {
       projectType: 'Web Application',
@@ -355,6 +152,11 @@ export default NewComponent`,
     for (const operation of operations) {
       try {
         console.log(`🤖 Executing file operation: ${operation.type} ${operation.path}`)
+        
+        // Dispatch terminal output
+        window.dispatchEvent(new CustomEvent('terminalOutput', {
+          detail: { output: `📄 ${operation.type.toUpperCase()}: ${operation.path}` }
+        }))
 
         let success = false
         switch (operation.type) {
@@ -377,8 +179,18 @@ export default NewComponent`,
         if (success) {
           results += `✅ ${operation.type.toUpperCase()}: ${operation.path}\n`
           results += `   Reason: ${operation.reason}\n\n`
+          
+          // Dispatch success to terminal
+          window.dispatchEvent(new CustomEvent('terminalOutput', {
+            detail: { output: `✓ ${operation.path} - ${operation.reason}` }
+          }))
         } else {
           results += `❌ Failed to ${operation.type}: ${operation.path}\n\n`
+          
+          // Dispatch error to terminal
+          window.dispatchEvent(new CustomEvent('terminalOutput', {
+            detail: { output: `✗ Failed: ${operation.path}` }
+          }))
         }
 
         completedOperations++
@@ -391,6 +203,11 @@ export default NewComponent`,
         console.error(`Failed to execute file operation ${operation.type} ${operation.path}:`, error)
         results += `❌ Error ${operation.type}: ${operation.path}\n`
         results += `   Error: ${error}\n\n`
+        
+        // Dispatch error to terminal
+        window.dispatchEvent(new CustomEvent('terminalOutput', {
+          detail: { output: `✗ Error: ${operation.path} - ${error}` }
+        }))
       }
     }
 
@@ -400,19 +217,72 @@ export default NewComponent`,
   private async executeTerminalCommands(commands: TerminalCommand[], task: AIAgentTask): Promise<string> {
     let results = ''
     let completedCommands = 0
+    let errorOutput: string[] = []
 
     for (const cmd of commands) {
       try {
         console.log(`🤖 Executing terminal command: ${cmd.command}`)
+
+        // Dispatch command start to terminal
+        window.dispatchEvent(new CustomEvent('terminalOutput', {
+          detail: { output: `$ ${cmd.command}` }
+        }))
 
         const response = await aiService.executeCommand(cmd.command, cmd.workingDirectory, cmd.timeout, cmd.description)
 
         if (response.success) {
           results += `✅ ${cmd.description}: ${cmd.command}\n`
           results += `Output: ${response.stdout}\n\n`
+          
+          // Dispatch success to terminal
+          if (response.stdout) {
+            window.dispatchEvent(new CustomEvent('terminalOutput', {
+              detail: { output: response.stdout }
+            }))
+          }
+          window.dispatchEvent(new CustomEvent('terminalOutput', {
+            detail: { output: `✓ ${cmd.description} completed` }
+          }))
         } else {
           results += `❌ ${cmd.description}: ${cmd.command}\n`
           results += `Error: ${response.stderr || response.error}\n\n`
+          
+          // Collect error output for auto-fixing
+          if (response.stderr) {
+            errorOutput.push(...response.stderr.split('\n'))
+          }
+          
+          // Dispatch error to terminal
+          if (response.stderr) {
+            window.dispatchEvent(new CustomEvent('terminalOutput', {
+              detail: { output: `✗ ${cmd.description} failed` }
+            }))
+            window.dispatchEvent(new CustomEvent('terminalOutput', {
+              detail: { output: response.stderr }
+            }))
+            
+            // Auto-fix errors if build fails
+            if (cmd.description.includes('build') || cmd.description.includes('Build')) {
+              window.dispatchEvent(new CustomEvent('terminalOutput', {
+                detail: { output: 'Analyzing errors and generating fixes...' }
+              }))
+              
+              const errors = errorDetector.detectErrors(errorOutput)
+              if (errors.length > 0) {
+                window.dispatchEvent(new CustomEvent('terminalOutput', {
+                  detail: { output: `Detected ${errors.length} error(s) - Attempting auto-fix...` }
+                }))
+                
+                // Try to fix the errors
+                const fixResults = await this.autoFixErrors(errorOutput)
+                for (const result of fixResults) {
+                  window.dispatchEvent(new CustomEvent('terminalOutput', {
+                    detail: { output: result }
+                  }))
+                }
+              }
+            }
+          }
         }
 
         completedCommands++
@@ -425,6 +295,14 @@ export default NewComponent`,
         console.error(`Failed to execute command ${cmd.command}:`, error)
         results += `❌ ${cmd.description}: ${cmd.command}\n`
         results += `Error: ${error}\n\n`
+        
+        // Collect error output
+        errorOutput.push(error?.toString() || 'Unknown error')
+        
+        // Dispatch error to terminal
+        window.dispatchEvent(new CustomEvent('terminalOutput', {
+          detail: { output: `✗ Command failed: ${cmd.command} - ${error}` }
+        }))
       }
     }
 
@@ -438,6 +316,13 @@ export default NewComponent`,
     window.dispatchEvent(new CustomEvent('aiTaskUpdate', {
       detail: task
     }))
+    
+    // Dispatch terminal output for real-time updates
+    if (task.result) {
+      window.dispatchEvent(new CustomEvent('terminalOutput', {
+        detail: { output: task.result }
+      }))
+    }
   }
 
   getActiveTasks(): AIAgentTask[] {
@@ -446,6 +331,77 @@ export default NewComponent`,
 
   getTask(taskId: string): AIAgentTask | undefined {
     return this.activeTasks.get(taskId)
+  }
+
+  async autoFixErrors(errorOutput: string[]): Promise<string[]> {
+    const errors = errorDetector.detectErrors(errorOutput)
+    
+    if (errors.length === 0) {
+      return []
+    }
+
+    const fixSteps: string[] = []
+    const fixes = new Map<string, string[]>()
+
+    // Generate fix suggestions
+    for (const error of errors) {
+      const suggestions: string[] = []
+
+      switch (error.type) {
+        case 'dependency':
+          const moduleName = error.message.match(/module ['"](.+?)['"]/)?.[1]
+          if (moduleName) {
+            fixSteps.push(`npm install ${moduleName}`)
+            suggestions.push(`Install missing dependency: ${moduleName}`)
+          }
+          break
+        case 'typescript':
+          if (error.suggestion) {
+            fixSteps.push(error.suggestion)
+            suggestions.push(`Fix TypeScript: ${error.suggestion}`)
+          }
+          break
+        case 'syntax':
+          fixSteps.push('Add React import')
+          suggestions.push('Ensure React import is present')
+          suggestions.push('Ensure file has .tsx extension')
+          break
+        case 'build':
+          fixSteps.push('Review build errors')
+          suggestions.push('Fix all TypeScript compilation errors')
+          break
+      }
+
+      if (error.file) {
+        fixes.set(error.file, suggestions)
+      }
+    }
+
+    // Execute fixes
+    const fixResults: string[] = []
+    for (const step of fixSteps) {
+      if (step.startsWith('npm install')) {
+        window.dispatchEvent(new CustomEvent('terminalOutput', {
+          detail: { output: `Auto-fixing: ${step}` }
+        }))
+        
+        const module = step.replace('npm install ', '').trim()
+        const response = await aiService.executeCommand(
+          `npm install ${module}`,
+          'frontend',
+          30000,
+          `Installing ${module}`
+        )
+        
+        if (response.success) {
+          fixResults.push(`✅ Fixed: Installed ${module}`)
+        } else {
+          fixResults.push(`❌ Failed: ${response.error}`)
+        }
+      }
+    }
+
+    return fixResults
   }
 }
 

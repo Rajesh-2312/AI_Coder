@@ -7,8 +7,6 @@ import {
   Terminal, 
   Code, 
   Save,
-  Download,
-  Upload,
   Play,
   Square
 } from 'lucide-react'
@@ -20,8 +18,8 @@ interface TopMenuProps {
 }
 
 export const TopMenu: React.FC<TopMenuProps> = ({ onSettingsOpen }) => {
-  const { activeTab, fileContents } = useApp()
-  const { executeCode, executeFile, isExecuting, getLanguageFromFilename } = useCodeExecution()
+  const { state } = useApp()
+  const { executeCode, isExecuting, getLanguageFromFilename } = useCodeExecution()
 
   const handleMenuAction = async (action: string) => {
     console.log('Menu action:', action)
@@ -36,29 +34,31 @@ export const TopMenu: React.FC<TopMenuProps> = ({ onSettingsOpen }) => {
       default:
         // Send to Electron main process if available
         if (window.electronAPI) {
-          window.electronAPI.onMenuAction((event: any, data: any) => {
-            console.log('Electron menu action:', data)
+          window.electronAPI.onMenuAction(() => {
+            console.log('Electron menu action')
           })
         }
     }
   }
 
   const handleRunCode = async () => {
-    if (!activeTab) {
+    // Get active file from AppContext
+    const activeFile = state.files.find(f => f.type === 'file')
+    if (!activeFile) {
       alert('Please open a file first')
       return
     }
 
-    const code = fileContents[activeTab] || ''
+    const code = activeFile.content || ''
     if (!code.trim()) {
       alert('File is empty')
       return
     }
 
-    const language = getLanguageFromFilename(activeTab)
+    const language = getLanguageFromFilename(activeFile.name)
     
     try {
-      console.log(`Running ${language} code from ${activeTab}`)
+      console.log(`Running ${language} code from ${activeFile.name}`)
       const result = await executeCode(code, { language })
       
       if (result.success) {

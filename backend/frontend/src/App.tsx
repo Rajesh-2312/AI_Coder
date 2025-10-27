@@ -1,11 +1,14 @@
 import React from 'react'
-import TicTacToe from './components/TicTacToe'
+import ToDoList from './components/ToDoList'
 import './App.css'
 
 function App() {
   return (
     <div className="App">
-      <TicTacToe />
+      <header className="App-header">
+        <h1>ToDoList</h1>
+        <ToDoList />
+      </header>
     </div>
   )
 }

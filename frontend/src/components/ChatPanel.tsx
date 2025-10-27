@@ -100,7 +100,7 @@ VirtualizedChat.displayName = 'VirtualizedChat'
 const ChatMessageComponent = memo<{
   message: ChatMessage
   isLast: boolean
-}>(({ message, isLast }) => {
+}>(({ message }) => {
   const [isVisible, setIsVisible] = useState(false)
   
   useEffect(() => {
